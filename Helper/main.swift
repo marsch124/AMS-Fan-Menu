@@ -64,26 +64,42 @@ final class FanWriter {
         }
     }
 
-    /// Forces one fan, so it takes a speed from the helper. Returns how it went.
+    /// Asks for one fan and waits until the Mac has really handed it over. Returns how it went.
+    ///
+    /// The Mac hands a fan over a few hundredths of a second AFTER it is asked (measured 24 Nov 2026 on an
+    /// M1 Max: 10 to 30 ms). Version 1 looked at once, saw "not yet", gave up — and left the fan held.
     private func force(_ index: Int, smc: SMC) -> (Bool, String) {
         let key = FanKeys.mode(index, smc: smc)
         if smc.number(key) == 1 { return (true, "") }
         var code = smc.write(key, number: 1)
-        if code == 0, smc.number(key) == 1 { return (true, "taken at once") }
+        if let waited = waitForHandOver(key, smc: smc, seconds: 1.5, code: &code) {
+            return (true, String(format: "handed over after %.2f s", waited))
+        }
         // Newer Macs want to be unlocked first, and then take a few seconds.
         if smc.exists(FanKeys.unlock) {
             _ = smc.write(FanKeys.unlock, number: 1)
             usedUnlock = true
-            let began = now
-            while now - began < 6 {
-                code = smc.write(key, number: 1)
-                if code == 0, smc.number(key) == 1 {
-                    return (true, String(format: "taken after unlocking, %.1f s", now - began))
-                }
-                usleep(100_000)
+            if let waited = waitForHandOver(key, smc: smc, seconds: 6, code: &code) {
+                return (true, String(format: "handed over after unlocking, %.2f s", waited))
             }
         }
-        return (false, "the Mac refused to hand over fan \(index + 1) (answer \(code.map { String($0, radix: 16) } ?? "none"))")
+        return (false, "the Mac did not hand over fan \(index + 1) (answer \(code.map { String($0, radix: 16) } ?? "none"), reads \(smc.number(key).map { String(Int($0)) } ?? "nothing"))")
+    }
+
+    /// Looks every hundredth of a second whether the fan is handed over, and asks again every 0.3 s.
+    /// Returns after how many seconds it was, or nil when the time ran out.
+    private func waitForHandOver(_ key: String, smc: SMC, seconds: Double, code: inout UInt8?) -> Double? {
+        let began = now
+        var asked = began
+        while now - began < seconds {
+            if smc.number(key) == 1 { return now - began }
+            usleep(10_000)
+            if now - asked >= 0.3 {
+                code = smc.write(key, number: 1)
+                asked = now
+            }
+        }
+        return smc.number(key) == 1 ? now - began : nil
     }
 
     func setSpeeds(_ asked: [Double]) -> (Bool, String) {
@@ -91,63 +107,87 @@ final class FanWriter {
         guard let smc else { return (false, "the fan controller did not open") }
         let count = FanKeys.count(smc)
         guard count > 0, asked.count == count else { return (false, "this Mac has \(count) fans, the app sent \(asked.count) speeds") }
-        var set: [Double] = []
-        var notes: [String] = []
+        // Every speed inside its fan's own range, before anything is touched.
+        var speeds: [Double] = []
         for index in 0..<count {
             guard let lowest = smc.number(FanKeys.lowest(index)), let top = smc.number(FanKeys.top(index)),
                   lowest > 0, top >= lowest else {
                 _ = giveBackNow()
                 return (false, "fan \(index + 1) did not tell its range")
             }
-            let speed = FanRange(lowest: lowest, top: top).kept(asked[index])
+            speeds.append(FanRange(lowest: lowest, top: top).kept(asked[index]))
+        }
+        // All fans handed over first, and only then the speeds: never one fan fast and one left behind.
+        var notes: [String] = []
+        for index in 0..<count {
             let forced = force(index, smc: smc)
             guard forced.0 else {
-                _ = giveBackNow()
-                HelperLog.note(forced.1)
+                let back = giveBackNow()
+                HelperLog.note(forced.1 + "; fans: " + back.1)
                 return (false, forced.1)
             }
-            if !forced.1.isEmpty { notes.append("fan \(index + 1) \(forced.1)") }
-            let code = smc.write(FanKeys.target(index), number: speed)
+            if !forced.1.isEmpty {
+                // While the helper holds the fans this means the Mac had taken one back in between.
+                notes.append("fan \(index + 1) \(forced.1)" + (running ? " (the Mac had taken it back)" : ""))
+            }
+        }
+        for index in 0..<count {
+            let speed = speeds[index]
+            var code = smc.write(FanKeys.target(index), number: speed)
             // Some Macs answer with a complaint and take the speed all the same: what counts is what is set.
-            let reads = smc.number(FanKeys.target(index)) ?? -1
-            guard code == 0 || abs(reads - speed) < 2 else {
-                _ = giveBackNow()
+            var reads = smc.number(FanKeys.target(index)) ?? -1
+            let began = now
+            while abs(reads - speed) >= 2, now - began < 1 {
+                usleep(20_000)
+                reads = smc.number(FanKeys.target(index)) ?? -1
+                if abs(reads - speed) >= 2, now - began > 0.3 { code = smc.write(FanKeys.target(index), number: speed) }
+            }
+            guard abs(reads - speed) < 2 else {
+                let back = giveBackNow()
                 let why = "fan \(index + 1) did not take the speed \(Int(speed)) (answer \(code.map { String($0, radix: 16) } ?? "none"), set \(Int(reads)))"
-                HelperLog.note(why)
+                HelperLog.note(why + "; fans: " + back.1)
                 return (false, why)
             }
-            set.append(speed)
         }
         running = true
-        if set != lastSet || !notes.isEmpty {
-            HelperLog.note("Speeds set: " + set.map { String(Int($0)) }.joined(separator: ", ")
+        if speeds != lastSet || !notes.isEmpty {
+            HelperLog.note("Speeds set: " + speeds.map { String(Int($0)) }.joined(separator: ", ")
                            + (notes.isEmpty ? "" : " (" + notes.joined(separator: "; ") + ")"))
-            lastSet = set
+            lastSet = speeds
         }
         return (true, notes.joined(separator: "; "))
     }
 
-    /// The Mac decides again.
+    /// The Mac decides again. Thorough: every fan is given back, then the helper keeps looking for a second
+    /// and gives back again any fan that turns up as held late (a hand-over that was still on its way).
     func giveBackNow() -> (Bool, String) {
         lastWord = now
         guard let smc else { return (false, "the fan controller did not open") }
-        var fine = true
-        for index in 0..<FanKeys.count(smc) {
-            let key = FanKeys.mode(index, smc: smc)
-            // 0 = the Mac decides; some Macs then show 3 ("looked after by the Mac"), which is the same thing.
-            if smc.number(key) == 1 {
-                let code = smc.write(key, number: 0)
-                if code != 0, smc.number(key) == 1 { fine = false }
+        let keys = (0..<FanKeys.count(smc)).map { FanKeys.mode($0, smc: smc) }
+        var gaveBack = 0
+        // 0 = the Mac decides; some Macs then show 3 ("looked after by the Mac"), which is the same thing.
+        for key in keys where smc.number(key) == 1 {
+            _ = smc.write(key, number: 0)
+            gaveBack += 1
+        }
+        let began = now
+        var calmSince = now
+        while now - began < 1, now - calmSince < 0.25 {
+            usleep(20_000)
+            for key in keys where smc.number(key) == 1 {
+                _ = smc.write(key, number: 0)
+                gaveBack += 1
+                calmSince = now
             }
         }
         if usedUnlock {
             _ = smc.write(FanKeys.unlock, number: 0)
             usedUnlock = false
         }
-        let was = running
+        let fine = !keys.contains { smc.number($0) == 1 }
         running = false
         lastSet = []
-        return (fine, fine ? (was ? "given back" : "the Mac already had them") : "a fan did not go back")
+        return (fine, fine ? (gaveBack > 0 ? "given back" : "the Mac already had them") : "a fan did not go back")
     }
 }
 

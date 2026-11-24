@@ -34,6 +34,14 @@ enum Guide {
     ]
 
     static let whatsNew: [Release] = [
+        Release(version: "0.1.1", date: "24 Nov 2026", items: [
+            "Fixed: in 0.1 no choice could be switched on. The Mac hands a fan over a few hundredths of a second after it is asked, and the helper looked at once, saw \"not yet\" and gave up. The helper now waits for the hand-over, looking every hundredth of a second for up to 1.5 seconds, and asks again every 0.3 seconds.",
+            "Fixed: after a failed try, a fan could stay held at its last speed without the app knowing. The helper now hands over all fans first and only then sets the speeds.",
+            "Changed: giving the fans back is now thorough. The helper gives back every fan, keeps looking for one more second and gives back again any fan that turned up as held late.",
+            "Changed: if the Mac takes a fan back by itself, the helper notices and takes it over again. It notes this in its log.",
+            "Changed: because the helper is new, the app asks once more for the Mac's password. An amber note says \"The fan helper is from an older version. It needs your OK once more.\" with the button \"Update the helper\u{2026}\".",
+            "Fixed: the Mac now takes a speed directly. Tested on this Mac: the left fan took 3,000 and went from about 1,520 to about 2,360 turns a minute within two seconds."
+        ]),
         Release(version: "0.1", date: "24 Nov 2026", items: [
             "New: the first version. AMS Fan Menu lives in the menu bar of your Mac and lets you choose how fast the fans turn. The Mac has no setting of its own for this.",
             "New: the menu bar shows a small hand-drawn fan mark. It is black (white at night) while the Mac decides and blue while the app runs the fans. Hovering says which.",

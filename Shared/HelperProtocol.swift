@@ -15,7 +15,7 @@ enum HelperInfo {
     /// Also the helper's file name and the name of its start order.
     static let label = "com.schabbauer.AMSFanMenu.helper"
     /// Raised whenever the helper's own code changes; the app then offers "Update the helper…".
-    static let version = "1"
+    static let version = "2"
     static let appID = "com.schabbauer.AMSFanMenu"
     static let team = "D24ENP83QQ"
     static let toolPath = "/Library/PrivilegedHelperTools/\(label)"

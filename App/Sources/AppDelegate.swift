@@ -36,6 +36,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        // For checks and for rescue: asks the helper to give every fan back to the Mac, whatever the app
+        // believes, then quits.
+        if arguments.contains("--give-back") {
+            print("fans given back:", HelperClient().giveBackAndWait(seconds: 5) ? "yes" : "no word from the helper")
+            NSApp.terminate(nil)
+            return
+        }
+        // For checks: asks the helper for these speeds ("--try-speeds 3000,3000") once a second for a few
+        // seconds ("--seconds 6"), prints every answer, then gives the fans back and quits.
+        if let index = arguments.firstIndex(of: "--try-speeds"), index + 1 < arguments.count {
+            let speeds = arguments[index + 1].split(separator: ",").compactMap { Double($0) }
+            let rounds = arguments.firstIndex(of: "--seconds").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 6
+            let client = HelperClient()
+            func round(_ number: Int) {
+                guard number <= rounds else {
+                    client.giveBack { fine, text in
+                        print("give back:", fine, text)
+                        NSApp.terminate(nil)
+                    }
+                    return
+                }
+                client.setSpeeds(speeds) { fine, text in
+                    print("round \(number):", fine, text)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { round(number + 1) }
+                }
+            }
+            round(1)
+            return
+        }
         // For checks: prints what would run with the Mac's deepest rights when you allow fan control.
         if arguments.contains("--helper-script") {
             print(HelperInstaller.installScript(tool: HelperInstaller.bundledTool, order: HelperInstaller.bundledOrder ?? "missing"))
@@ -46,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if let index = arguments.firstIndex(of: "--choose"), index + 1 < arguments.count {
             DistributedNotificationCenter.default().postNotificationName(Self.chooseName, object: arguments[index + 1],
                                                                          userInfo: nil, deliverImmediately: true)
-            NSApp.terminate(nil)
+            // A moment for the message to leave: quitting at once lost it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { NSApp.terminate(nil) }
             return
         }
         // Switches "Open at login" on or off from outside, then quits: "--open-at-login on". "status" only looks.
