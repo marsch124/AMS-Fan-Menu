@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private static let pretendWakeName = Notification.Name("com.schabbauer.AMSFanMenu.pretendWake")
     private static let pretendBatteryName = Notification.Name("com.schabbauer.AMSFanMenu.pretendBattery")
     private static let pretendCallName = Notification.Name("com.schabbauer.AMSFanMenu.pretendCall")
+    private static let pretendChipName = Notification.Name("com.schabbauer.AMSFanMenu.pretendChip")
 
     /// Tells the running copy something, then quits. A moment for the message to leave: quitting at once lost it.
     private func tellRunningCopy(_ name: Notification.Name, _ word: String?) {
@@ -88,12 +89,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         // For checks: the running copy behaves as if the Mac slept and woke ("--pretend-wake"), as if the power
         // cable were pulled ("--pretend-battery on", "off", or "real" to look at the real thing again), or as if
-        // a call were on ("--pretend-call on|off|real").
+        // a call were on ("--pretend-call on|off|real"), or as if the chip had a temperature, for Quiet's rest only
+        // ("--pretend-chip 55", or "real").
         if arguments.contains("--pretend-wake") {
             tellRunningCopy(Self.pretendWakeName, nil)
             return
         }
-        for (flag, name) in [("--pretend-battery", Self.pretendBatteryName), ("--pretend-call", Self.pretendCallName)] {
+        for (flag, name) in [("--pretend-battery", Self.pretendBatteryName), ("--pretend-call", Self.pretendCallName),
+                             ("--pretend-chip", Self.pretendChipName)] {
             if let index = arguments.firstIndex(of: flag), index + 1 < arguments.count {
                 tellRunningCopy(name, arguments[index + 1])
                 return
@@ -163,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         center.addObserver(self, selector: #selector(pretendWake), name: Self.pretendWakeName, object: nil)
         center.addObserver(self, selector: #selector(pretendBattery(_:)), name: Self.pretendBatteryName, object: nil)
         center.addObserver(self, selector: #selector(pretendCall(_:)), name: Self.pretendCallName, object: nil)
+        center.addObserver(self, selector: #selector(pretendChip(_:)), name: Self.pretendChipName, object: nil)
         let notes = UNUserNotificationCenter.current()
         notes.delegate = self
         // The heat notice carries a button.
@@ -176,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @objc private func pretendWake() { model?.pretendSleepAndWake() }
     @objc private func pretendBattery(_ notification: Notification) { model?.pretend(battery: notification.object as? String ?? "real") }
     @objc private func pretendCall(_ notification: Notification) { model?.pretend(call: notification.object as? String ?? "real") }
+    @objc private func pretendChip(_ notification: Notification) { model?.pretend(chip: notification.object as? String ?? "real") }
 
     @objc private func chooseFromOutside(_ notification: Notification) {
         guard let word = notification.object as? String, let choice = FanChoice(rawValue: word) else { return }
@@ -273,6 +278,7 @@ enum Snapshots {
                 ("panel-follow", .sample(.follow)),
                 ("panel-timed", .sample(.cool, lasting: .tenMinutes, left: "8 min left")),
                 ("panel-call", .sample(.quiet, reason: "during a call")),
+                ("panel-resting", .sample(.quiet, resting: true)),
                 ("panel-needs-ok", .sample(.automatic, note: needsOK, helper: .missing)),
                 ("panel-too-hot", .sample(.automatic, note: tooHot)),
             ]

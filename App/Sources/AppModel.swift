@@ -76,6 +76,11 @@ final class AppModel: ObservableObject {
     @Published private(set) var quietInCalls: Bool
     @Published private(set) var batteryRule: Bool
     @Published private(set) var backAfterSleep: Bool
+    // 0.3
+    /// Quiet gives the fans to the Mac while the chip is cool, so they can stop.
+    @Published private(set) var quietRest: Bool
+    /// Quiet is on and the Mac has the fans, because it is cool.
+    @Published private(set) var resting = false
     @Published private(set) var happened: [Happening] = []
     /// The readings behind the graphs, and the time of the newest one.
     @Published private(set) var history = History()
@@ -131,12 +136,20 @@ final class AppModel: ObservableObject {
     // For checks: pretend the cable is pulled, or a call is on.
     private var pretendBattery: Bool?
     private var pretendCall: Bool?
+    // Quiet lets the fans stop
+    private var coolSince: Double?
+    private var overSince: Double?
+    /// When the app last took the fans back from a rest.
+    private var heldSince: Double?
+    /// For checks: pretend the chip has this temperature (only for the rest, nothing else).
+    private var pretendChip: Double?
     private var lastHistorySave = 0.0
 
     private enum Key {
         static let percent = "mySpeedPercent", start = "followStart", full = "followFull"
         static let lasting = "lasting", quiet = "quietPercent", cool = "coolPercent"
         static let heatNotice = "heatNotice", quietInCalls = "quietInCalls", batteryRule = "batteryRule", backAfterSleep = "backAfterSleep"
+        static let quietRest = "quietRest"
         static let happened = "happened"
     }
     static let heatCategory = "heat"
@@ -171,6 +184,7 @@ final class AppModel: ObservableObject {
         quietInCalls = store.object(forKey: Key.quietInCalls) as? Bool ?? false
         batteryRule = store.object(forKey: Key.batteryRule) as? Bool ?? true
         backAfterSleep = store.object(forKey: Key.backAfterSleep) as? Bool ?? false
+        quietRest = store.object(forKey: Key.quietRest) as? Bool ?? true
         smc = live || readOnly ? SMC() : nil
         guard self.live else {
             if readOnly { read() }
@@ -264,6 +278,7 @@ final class AppModel: ObservableObject {
     private func tick() {
         read()
         addSample()
+        coolSince = QuietRest.coolSince(chip: restChip, now: now, since: coolSince)
         checkPower()
         checkCall()
         guard choice.appDecides else {
@@ -285,8 +300,9 @@ final class AppModel: ObservableObject {
         }
         let left = Lasting.leftWords(endsAt: endsAt, now: wall)
         if left != leftWords { leftWords = left }
+        checkRest()
         // The Mac takes the fans back when it hears nothing, so the choice is repeated; Follow also moves with the heat.
-        if now - lastSend >= DeadMan.repeatEvery { send() }
+        if !resting, now - lastSend >= DeadMan.repeatEvery { send() }
     }
 
     // MARK: Choosing
@@ -333,6 +349,9 @@ final class AppModel: ObservableObject {
         waiting = nil
         hotSince = nil
         sent = nil
+        resting = false
+        heldSince = nil
+        overSince = nil
         reason = cause == .call ? "during a call" : nil
         // Quiet during a call lasts as long as the call, not as long as the "For" line says.
         endsAt = cause == .call ? nil : lasting.endsAt(from: wall)
@@ -343,7 +362,13 @@ final class AppModel: ObservableObject {
             if yours { tell(new.title + (lasting.words.map { " for \($0)" } ?? "")) }
             changed(to: new)
         }
-        send()
+        // Quiet on a Mac that is already cool: straight to the rest, without a second at the lowest speed first.
+        if new == .quiet, QuietRest.step(enabled: quietRest, resting: false, coolSince: coolSince, overSince: nil,
+                                         heldSince: nil, now: now) == .rest {
+            beginRest()
+        } else {
+            send()
+        }
         retime()
         askForNotes()
     }
@@ -357,7 +382,7 @@ final class AppModel: ObservableObject {
     }
 
     private func send() {
-        guard choice.appDecides, let speeds = wantedSpeeds() else { return }
+        guard choice.appDecides, !resting, let speeds = wantedSpeeds() else { return }
         let first = sent == nil
         let changed = sent != speeds
         sent = speeds
@@ -395,6 +420,9 @@ final class AppModel: ObservableObject {
         leftWords = nil
         reason = nil
         callActive = false
+        resting = false
+        heldSince = nil
+        overSince = nil
         if was.appDecides {
             client.giveBack { fine, text in
                 if !fine { Diary.note("Giving the fans back: \(text)") }
@@ -516,6 +544,65 @@ final class AppModel: ObservableObject {
     func setBackAfterSleep(_ on: Bool) {
         backAfterSleep = on
         UserDefaults.standard.set(on, forKey: Key.backAfterSleep)
+    }
+
+    // MARK: 0.3 — Quiet lets the fans stop
+
+    /// The chip temperature the rest goes by: the average of the newest readings.
+    private var restChip: Double? { pretendChip ?? Follow.smoothed(chipReadings) }
+
+    /// While Quiet is on: cool for a while → the Mac gets the fans and may stop them; the Mac wants them
+    /// faster than Quiet → the app takes them again and holds them at Quiet's speed.
+    private func checkRest() {
+        guard choice == .quiet else { return }
+        if resting {
+            let share = min(max(quietPercent, 0), 100) / 100
+            overSince = QuietRest.overSince(speeds: fans.map(\.speed), quiet: fans.map { $0.range.speed(share: share) },
+                                            now: now, since: overSince)
+        }
+        switch QuietRest.step(enabled: quietRest, resting: resting, coolSince: coolSince, overSince: overSince,
+                              heldSince: heldSince, now: now) {
+        case .nothing: break
+        case .rest: beginRest()
+        case .hold: endRest()
+        }
+    }
+
+    private func beginRest() {
+        resting = true
+        sent = nil
+        overSince = nil
+        sendSoon?.cancel()
+        client.giveBack { fine, text in
+            if !fine { Diary.note("Quiet, giving the fans to the Mac for a rest: \(text)") }
+        }
+        Diary.note("Quiet: the chip is cool (\(Words.degrees(restChip))); the Mac has the fans and may stop them")
+        writeState()
+    }
+
+    private func endRest() {
+        let speeds = fans.map { Words.turns($0.speed) }.joined(separator: " and ")
+        resting = false
+        heldSince = now
+        overSince = nil
+        Diary.note(quietRest ? "Quiet: the Mac ran the fans faster than Quiet (\(speeds)); the app holds them at Quiet's speed again"
+                             : "Quiet: \"Quiet lets the fans stop\" was switched off; the app holds the fans at Quiet's speed again")
+        writeState()
+        send()
+    }
+
+    func setQuietRest(_ on: Bool) {
+        quietRest = on
+        UserDefaults.standard.set(on, forKey: Key.quietRest)
+        if live { checkRest() }
+    }
+
+    /// For checks: a number pretends the chip has that temperature (for the rest only); anything else looks
+    /// at the real one again.
+    func pretend(chip word: String) {
+        pretendChip = Double(word)
+        coolSince = nil
+        Diary.note("Asked from outside to pretend: chip \(word)")
     }
 
     // MARK: 0.2 — the rules that act by themselves
@@ -654,6 +741,7 @@ final class AppModel: ObservableObject {
                                     "since": choiceSince, "version": AppInfo.version]
         if let endsAt { state["endsAt"] = endsAt }
         if let reason { state["reason"] = reason }
+        state["resting"] = resting
         try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
         if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: Self.stateFile, options: .atomic)
@@ -780,14 +868,17 @@ final class AppModel: ObservableObject {
     // MARK: Sample data for pictures
 
     static func sample(_ choice: FanChoice = .automatic, note: Note? = nil, helper: HelperState = .ready,
-                       lasting: Lasting = .untilChanged, left: String? = nil, reason: String? = nil) -> AppModel {
+                       lasting: Lasting = .untilChanged, left: String? = nil, reason: String? = nil,
+                       resting: Bool = false) -> AppModel {
         let model = AppModel(live: false)
         let hard = choice == .full || choice == .cool
         model.fans = [
-            FanNow(id: 0, name: "Left", speed: choice == .automatic ? 1776 : hard ? 3424 : 1499, range: FanRange(lowest: 1499, top: 5348)),
-            FanNow(id: 1, name: "Right", speed: choice == .automatic ? 1868 : hard ? 3638 : 1499, range: FanRange(lowest: 1499, top: 5776)),
+            FanNow(id: 0, name: "Left", speed: resting ? 0 : choice == .automatic ? 1776 : hard ? 3424 : 1499, range: FanRange(lowest: 1499, top: 5348)),
+            FanNow(id: 1, name: "Right", speed: resting ? 0 : choice == .automatic ? 1868 : hard ? 3638 : 1499, range: FanRange(lowest: 1499, top: 5776)),
         ]
-        model.chip = 72
+        model.resting = resting
+        model.quietRest = true
+        model.chip = resting ? 56 : 72
         model.graphics = 64
         model.battery = 36
         model.myPercent = 45

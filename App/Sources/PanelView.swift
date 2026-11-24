@@ -104,7 +104,7 @@ struct PanelView: View {
                 line([("Chip", Words.degrees(model.chip)), ("Graphics", Words.degrees(model.graphics)), ("Battery", Words.degrees(model.battery))])
                     .font(.callout).monospacedDigit().accessibilityIdentifier("temperatures")
             }
-            Text(Words.status(model.choice, left: model.leftWords, reason: model.reason))
+            Text(Words.status(model.choice, left: model.leftWords, reason: model.reason, resting: model.resting))
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(model.choice.appDecides ? Palette.fan(scheme) : Palette.mac(scheme))
                 .accessibilityIdentifier("statusLine")

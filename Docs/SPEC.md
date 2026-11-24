@@ -1,4 +1,4 @@
-# AMS Fan Menu 0.2 (build 3, 24 Nov 2026) - Specification
+# AMS Fan Menu 0.3 (build 4, 24 Nov 2026) - Specification
 
 ## Purpose
 
@@ -9,13 +9,13 @@ It is installed directly on the Mac, not through TestFlight, because a sandboxed
 ## Hardware it is made for
 
 - MacBook Pro 16-inch 2021 (MacBookPro18,2, M1 Max), with two fans. Apple Silicon, macOS 15 or later.
-- Measured 24 Nov 2026: in Automatic this Mac stops both fans completely (speed 0, hand-over state 3, target 0) when the chip is cool (seen at about 63°), and runs them at about 1,500 to 1,900 when it is warm (70° to 80°). So the lowest speed the app can set (1,499) is the lowest RUNNING speed, and Automatic can be quieter than Quiet. The panel and the graph show the true 0.
+- Measured 24 Nov 2026: in Automatic this Mac stops both fans completely (speed 0, hand-over state 3, target 0) when the chip is cool (seen at about 63°), and runs them at about 1,500 to 1,900 when it is warm (70° to 80°). So the lowest speed the app can set (1,499) is the lowest RUNNING speed. Up to 0.2 this made Automatic quieter than Quiet; from 0.3 Quiet can let the fans rest (see "Quiet lets the fans stop"). The panel and the graph show the true 0.
 - The speed ranges are read from the Mac, not fixed. On this Mac the lowest speed is 1,499 turns a minute for both fans. The top speed is 5,348 for the left fan (fan 0) and 5,776 for the right fan (fan 1).
 
 ## Menu bar item
 
 - A hand-drawn fan mark only, no figure.
-- Black (white at night) means the Mac decides. Blue means AMS Fan Menu runs the fans (any choice except Automatic).
+- Black (white at night) means the Mac decides. Blue means your choice is on: AMS Fan Menu runs the fans (any choice except Automatic), also while Quiet lets the fans rest (0.3).
 - Hover text: "Fans: the Mac decides" or "Fans: you decide (Cool)" (with the name of the choice in use). From 0.2 a second line gives the figures, for example "Left 1,776 · Right 1,868 · Chip 72°". The mark itself stays without a figure.
 - A click opens the panel. The panel does not take the keyboard away from the app in front.
 - The item has the autosave name "fanMenu". If the Mac moves its saved place to the far left (a value above 1000) and the item is out of sight for 10 seconds, the app puts it back at its home place, 190 points from the right edge.
@@ -44,7 +44,7 @@ The choice in use is shown in full colour with white words. The others are pale.
 | Choice | Colour | What it does |
 |---|---|---|
 | Automatic | green | The Mac decides. |
-| Quiet | blue | Lowest speed by default; from 0.2 the owner's own Quiet percentage (0 % to 40 %, default 0 % = lowest speed). |
+| Quiet | blue | Lowest speed by default; from 0.2 the owner's own Quiet percentage (0 % to 40 %, default 0 % = lowest speed). From 0.3, while the chip is cool, the fans may rest (see below); the Quiet speed is held again as soon as the Mac runs them faster. |
 | Cool | blue | Half speed by default (50 % of the way from lowest to top); from 0.2 the owner's own Cool percentage (30 % to 90 %, default 50 %). |
 | Full | blue | Top speed. |
 | My speed N % | blue | A slider. 0 % is lowest, 100 % is top. Both fans together, each on its own range. Dragging the slider switches to My speed. |
@@ -60,6 +60,21 @@ Follow temperature in detail:
 ## Your own Quiet and Cool (0.2)
 
 Settings has "Your speeds": Quiet from 0 % to 40 % (default 0 % = lowest speed) and Cool from 30 % to 90 % (default 50 % = half speed), in steps of 5. The percentage is the share of the way from each fan's own lowest to its own top. The words under the two buttons follow: "lowest speed", "half speed", or for example "40 % speed".
+
+## Quiet lets the fans stop (0.3)
+
+Before 0.3 Quiet always held both fans at the Quiet speed (at least the lowest running speed, 1,499 on this Mac), while the Mac in Automatic stops its fans (0 turns) when the chip is cool (about 63°). So Automatic could be quieter than Quiet. From 0.3 the fans may stop while Quiet is on.
+
+- The app can never set a fan below its lowest running speed, so a rest is done by giving the fans to the Mac, which stops them when it finds it cool enough. The status line then says "You decide: Quiet · fans resting". The Quiet button stays in full colour and the menu bar mark stays blue (blue = the choice is on, here Quiet including its rest). The choice in use stays Quiet.
+- Rest begins: while Quiet is on and held, the chip has been at 60° or less for 30 seconds (`coolBelow` 60, `coolFor` 30 s). The app gives the fans to the Mac.
+- Rest ends: the Mac runs a fan more than 150 turns faster than the Quiet speed for 4 seconds (`overBy` 150, `overFor` 4 s). The app then takes the fans again and holds them at the Quiet speed, exactly as before 0.3, so Quiet is never louder than in 0.2.
+- After taking the fans again, the app holds them for at least 5 minutes (`holdAtLeast` 300 s) before a rest may begin again, so the fans do not switch back and forth.
+- The rule constants are in `Core/Sources/FanMenuCore/More.swift` as `enum QuietRest` (coolBelow 60, coolFor 30 s, overBy 150 turns, overFor 4 s, holdAtLeast 300 s). One new rule test covers it.
+- Switch in Settings, in "Your speeds": "Quiet lets the fans stop". On by default. Stored setting name: `quietRest` (true/false in the app's defaults). Off = Quiet behaves as in 0.2: always the Quiet speed, never stopped. Switching it off in the middle of a rest takes the fans again at once and holds the Quiet speed.
+- Same with "Quiet during calls" (it switches to Quiet, so the fans may rest then too) and with the owner's own Quiet speed.
+- Unchanged: all safety rules (too hot: 100° for 15 s hands back to the Mac), the "For" time still ends Quiet, battery, sleep, quit. The helper is unchanged (version 2); no new password.
+- Graphs: a rest shows as the speed line going down to 0 while Quiet is on. This is true, not a fault.
+- Check hook: `--pretend-chip <degrees>|real` makes the app use that chip temperature for the rest rule (instead of the real one), so a rest can be tried without waiting for a cool Mac; `real` goes back to the real reading.
 
 ## A choice for a limited time (0.2)
 
@@ -84,6 +99,7 @@ While the Mac decides (Automatic): when the chip has been at 90 degrees or more 
 - When an app has used the microphone for 15 seconds (a video call; a short dictation does not count), the app switches to Quiet. Status line: "You decide: Quiet (during a call)".
 - When the microphone has been free for 30 seconds, the choice from before comes back (Automatic too).
 - If the owner taps a choice during the call, the tap wins and nothing is put back.
+- From 0.3 the fans may rest during the call too (the call switches to Quiet; see "Quiet lets the fans stop").
 - A video call warms the Mac; with the fans at their lowest it may reach the too-hot limit (safety rule 1), and then the Mac gets the fans back as always.
 
 ## On battery: the Mac decides (0.2)
@@ -109,20 +125,20 @@ Setting fans needs administrator rights, so a small helper tool runs in the back
 
 ## Safety rules
 
-1. Too hot: if the hottest processor core is at 100 degrees or more for 15 seconds while Quiet, Cool, My speed or Follow is on, the app gives the fans back, switches to Automatic, shows the amber note "Too hot (101 deg). The Mac has the fans again." (with the real value) and sends a notification. Full is exempt.
+1. Too hot: if the hottest processor core is at 100 degrees or more for 15 seconds while Quiet (also while it rests the fans, from 0.3), Cool, My speed or Follow is on, the app gives the fans back, switches to Automatic, shows the amber note "Too hot (101 deg). The Mac has the fans again." (with the real value) and sends a notification. Full is exempt.
 2. Quit, sleep, restart: on Quit (also a polite stop signal), sleep or restart, the fans are given back. After wake the app stays on Automatic with an amber note, unless the switch "Choice back after sleep" is on (then the choice returns about 5 seconds after wake). Quit and restart always leave the app on Automatic. The choice in use is never stored.
 3. Dead man's switch: the app repeats its choice every 3 seconds. If the helper hears nothing for 20 seconds it gives the fans back. With nothing to do for 60 seconds the helper ends, and the Mac starts it again when needed. From 0.2 the app also asks the helper to give the fans back the moment it starts, so after an unexpected stop the screen ("The Mac decides") and the fans agree (before, the helper could hold the old speed for up to 20 seconds).
 4. Speeds are limited twice: in the app and again in the helper, each fan to its own lowest and top speed.
 
 ## What is remembered
 
-Stored on the Mac (UserDefaults): the My speed percentage, Start, Full, the wish for Open at login, the time picked in the "For" line, the Quiet and Cool percentages, and the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep). Also on this Mac only: the history file with the graph readings (six hours) and the What happened list (last 20). The choice in use is never stored, so the app always starts on Automatic.
+Stored on the Mac (UserDefaults): the My speed percentage, Start, Full, the wish for Open at login, the time picked in the "For" line, the Quiet and Cool percentages, the switch `quietRest` (Quiet lets the fans stop, 0.3, default on), and the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep). Also on this Mac only: the history file with the graph readings (six hours) and the What happened list (last 20). The choice in use is never stored, so the app always starts on Automatic.
 
 ## Settings window
 
 440 x 560 points, with four drawn tabs: Settings (green), What happened, How it works (blue), What's new (coral).
 
-- Settings: Open at login, "Your speeds" (Quiet and Cool), the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep), the helper state with "Remove the helper...", the version, "Quit AMS Fan Menu", and "Done" (Escape closes the window).
+- Settings: Open at login, "Your speeds" (Quiet and Cool, and from 0.3 the switch "Quiet lets the fans stop"), the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep), the helper state with "Remove the helper...", the version, "Quit AMS Fan Menu", and "Done" (Escape closes the window).
 - What happened: the last 20 things the app did (see above).
 - Open at login uses the "keeper": a LaunchAgent, `com.schabbauer.AMSFanMenu.keeper`, that opens the app at login and after an unexpected stop, but not after Quit.
 - How it works: a guide to the whole app, including the section "Signs in this app" (every mark and colour with its meaning).
@@ -142,18 +158,19 @@ Only one copy of the app runs: the copy that started first stays.
   - `--give-back`: asks the helper to give every fan back to the Mac, whatever the app believes, then quits.
   - `--try-speeds 3000,3000 --seconds 6`: asks the helper for these speeds once a second for that many seconds, prints each answer, gives the fans back, then quits.
   - `--open-at-login on|off|status`.
+  - `--pretend-chip <degrees>|real` (0.3): makes the app use that chip temperature for the Quiet rest rule, or the real reading with `real`. For tests.
   - `--pretend-wake`, `--pretend-battery on|off`, `--pretend-call on|off` (0.2): send a distributed notification to the running copy that acts as if the Mac woke, the power cable was pulled or put back, or a call began or ended. For tests.
   - Distributed notifications: `com.schabbauer.AMSFanMenu.togglePanel` and `com.schabbauer.AMSFanMenu.openSettings`.
 
 ## For other apps (0.2)
 
-On every change the app writes its state to `~/Library/Application Support/AMS Fan Menu/state.json` (the choice, its title, whether the app decides, when it began, when it ends) and posts the distributed notification `com.schabbauer.AMSFanMenu.changed`. `--choose <choice>` switches. AMS Deck Mate's fan keys use this.
+On every change the app writes its state to `~/Library/Application Support/AMS Fan Menu/state.json` (the choice, its title, whether the app decides, when it began, when it ends, and from 0.3 `resting`, true or false: true while Quiet lets the fans rest; `choice` stays "quiet" during a rest) and posts the distributed notification `com.schabbauer.AMSFanMenu.changed`. `--choose <choice>` switches. AMS Deck Mate's fan keys use this.
 
 ## How it is built
 
 - XcodeGen (`project.yml`) generates the Xcode project. Signed with an Apple Development certificate. macOS 15 or later.
 - AppKit status item with a SwiftUI popover.
-- `Core/`: a Swift package, `FanMenuCore`, with the rules that need no hardware (Cool, My speed, Follow, smoothing, safety). Tested with `swift test --package-path Core`.
+- `Core/`: a Swift package, `FanMenuCore`, with the rules that need no hardware (Cool, My speed, Follow, smoothing, safety, and from 0.3 the Quiet rest rule `QuietRest`). Tested with `swift test --package-path Core`.
 - `Shared/`: reading the Mac's sensors and fans, and the helper's protocol. Compiled into both the app and the helper.
 - `Helper/`: the root helper tool.
 - Install by the app: the Mac's password dialog (osascript, "with administrator privileges") copies the helper from `Contents/Library/HelperTools/com.schabbauer.AMSFanMenu.helper` to `/Library/PrivilegedHelperTools/`, writes `/Library/LaunchDaemons/com.schabbauer.AMSFanMenu.helper.plist` (started on demand through its Mach service) and loads it.
@@ -182,6 +199,8 @@ Not proven yet:
 - 0.1.1 (build 2, 24 Nov 2026): fix. Cause: in 0.1 no choice could be switched on ("the Mac refused to hand over fan 1 (answer 0)"), because the Mac hands a fan over a few hundredths of a second after the helper asks and the helper looked at once and gave up; the fan it had asked for was then left held at its last speed without the app knowing (the right fan stayed at about 1,643 turns a minute for about a minute until given back by hand). Fix: helper version 2 waits for the hand-over (every 0.01 s up to 1.5 s, asks again every 0.3 s), hands over all fans before setting speeds, gives back thoroughly (every fan, 1 more second of looking, again for any late one) and takes a fan over again if the Mac took it back. New hooks `--give-back` and `--try-speeds`; `--choose` now waits a moment before quitting. The app asks once more for the Mac's password (helper update).
 
 - 0.2 (build 3, 24 Nov 2026): graphs (small in the panel, large in its own window with 15 minutes / 1 hour / 6 hours, readings every 5 seconds, six hours kept, saved on this Mac); a choice for a limited time ("For" line); figures on hover; own Quiet (0 to 40 %) and Cool (30 to 90 %); heat notice (90 degrees for 5 minutes, at most every 30 minutes); Quiet during calls (microphone 15 seconds on, 30 seconds off); on battery the Mac decides; What happened tab (last 20); choice back after sleep (about 5 seconds after wake); four settings tabs; new sign (dashed line); state.json and the `changed` notification for other apps; hooks `--pretend-wake`, `--pretend-battery`, `--pretend-call`. Fixed: after an unexpected stop the app said "The Mac decides" while the helper held the old speed for up to 20 seconds; the app now asks the helper to give the fans back at start. The helper did not change (version 2), so no password is needed.
+
+- 0.3 (build 4, 24 Nov 2026): Quiet lets the fans stop. While Quiet is on and the chip has been at 60° or less for 30 seconds, the app gives the fans to the Mac, which stops them; if the Mac runs a fan more than 150 turns above the Quiet speed for 4 seconds, the app takes them again at the Quiet speed and holds them at least 5 minutes before another rest. Status line "You decide: Quiet · fans resting"; button and menu bar mark stay in full colour / blue. New switch "Quiet lets the fans stop" in "Your speeds" (setting `quietRest`, on by default; off = as in 0.2, switching off during a rest brings the Quiet speed back at once). `enum QuietRest` in `Core/Sources/FanMenuCore/More.swift`, one new rule test, `resting` key in state.json, hook `--pretend-chip <degrees>|real`. The helper did not change (version 2), so no password is needed.
 
 ## Icon files
 

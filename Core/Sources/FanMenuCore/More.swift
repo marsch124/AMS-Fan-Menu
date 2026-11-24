@@ -230,6 +230,54 @@ public enum Presets {
     }
 }
 
+// MARK: Quiet lets the fans stop (0.3)
+
+/// Left alone, this Mac stops its fans completely while the chip is cool; the app can never set a fan below
+/// its lowest running speed. So while Quiet is on and the chip is cool, the app gives the fans to the Mac
+/// ("resting"). The moment the Mac wants them faster than Quiet, the app takes them again and holds them
+/// at Quiet's speed. Quiet is then never louder than before, and silent when the Mac is cool.
+public enum QuietRest {
+    /// The chip at or below this …
+    public static let coolBelow = 60.0
+    /// … for this many seconds: the fans may rest.
+    public static let coolFor = 30.0
+    /// A fan this many turns above its Quiet speed means the Mac wants more than Quiet …
+    public static let overBy = 150.0
+    /// … for this many seconds in a row.
+    public static let overFor = 4.0
+    /// After taking the fans again, they are held at least this long, so they do not hunt.
+    public static let holdAtLeast = 5 * 60.0
+
+    public enum Step: Equatable, Sendable { case nothing, rest, hold }
+
+    /// Since when the chip has been cool without a break (nil = it is not, or there is no reading).
+    public static func coolSince(chip: Double?, now: Double, since: Double?) -> Double? {
+        guard let chip, chip <= coolBelow else { return nil }
+        return since ?? now
+    }
+
+    /// Since when a fan has run faster than Quiet allows (nil = none does). `quiet`: Quiet's speed per fan.
+    public static func overSince(speeds: [Double?], quiet: [Double], now: Double, since: Double?) -> Double? {
+        let over = zip(speeds, quiet).contains { speed, quiet in (speed ?? 0) > quiet + overBy }
+        return over ? (since ?? now) : nil
+    }
+
+    /// `resting`: the Mac has the fans because it is cool. `heldSince`: when the app last took them back
+    /// from a rest (nil = not yet in this Quiet).
+    public static func step(enabled: Bool, resting: Bool, coolSince: Double?, overSince: Double?,
+                            heldSince: Double?, now: Double) -> Step {
+        if resting {
+            // Switched off in Settings in the middle of a rest: Quiet's own speed at once.
+            if !enabled { return .hold }
+            if let overSince, now - overSince >= overFor { return .hold }
+            return .nothing
+        }
+        guard enabled, let coolSince, now - coolSince >= coolFor else { return .nothing }
+        if let heldSince, now - heldSince < holdAtLeast { return .nothing }
+        return .rest
+    }
+}
+
 // MARK: The heat notice while the Mac decides
 
 public enum HeatNotice {
@@ -326,10 +374,12 @@ public enum HappenedLog {
 // MARK: More words
 
 public extension Words {
-    /// "You decide: Cool · 8 min left", "You decide: Quiet (during a call)", "The Mac decides (on battery)".
-    static func status(_ choice: FanChoice, left: String?, reason: String?) -> String {
+    /// "You decide: Cool · 8 min left", "You decide: Quiet (during a call)", "The Mac decides (on battery)",
+    /// "You decide: Quiet · fans resting" while Quiet has given the fans to the cool Mac.
+    static func status(_ choice: FanChoice, left: String?, reason: String?, resting: Bool = false) -> String {
         var text = status(choice)
         if let reason, !reason.isEmpty { text += " (\(reason))" }
+        if choice == .quiet, resting { text += " · fans resting" }
         if choice.appDecides, let left { text += " · \(left)" }
         return text
     }

@@ -187,6 +187,41 @@ final class MoreTests: XCTestCase {
         XCTAssertEqual(HappenedLog.forShow(Array(list.prefix(3))).map(\.time), [4, 3, 2])
     }
 
+    func testQuietRestsWhenCoolAndHoldsWhenTheMacWantsMore() {
+        // Cool for 30 seconds: the fans may rest. Not before, not without a reading, not above 60°.
+        XCTAssertEqual(QuietRest.coolSince(chip: 60, now: 10, since: nil), 10)
+        XCTAssertEqual(QuietRest.coolSince(chip: 55, now: 20, since: 10), 10)
+        XCTAssertNil(QuietRest.coolSince(chip: 60.5, now: 20, since: 10))
+        XCTAssertNil(QuietRest.coolSince(chip: nil, now: 20, since: 10))
+        func holding(cool: Double?, held: Double? = nil, now: Double, enabled: Bool = true) -> QuietRest.Step {
+            QuietRest.step(enabled: enabled, resting: false, coolSince: cool, overSince: nil, heldSince: held, now: now)
+        }
+        XCTAssertEqual(holding(cool: 0, now: 29), .nothing)
+        XCTAssertEqual(holding(cool: 0, now: 30), .rest)
+        XCTAssertEqual(holding(cool: nil, now: 500), .nothing)
+        XCTAssertEqual(holding(cool: 0, now: 30, enabled: false), .nothing)
+        // Taken back from a rest: held for five minutes, however cool.
+        XCTAssertEqual(holding(cool: 100, held: 100, now: 399), .nothing)
+        XCTAssertEqual(holding(cool: 100, held: 100, now: 400), .rest)
+        // Resting: a fan more than 150 turns above its Quiet speed for 4 seconds ends the rest.
+        XCTAssertNil(QuietRest.overSince(speeds: [0, 0], quiet: [1499, 1499], now: 5, since: nil))
+        XCTAssertNil(QuietRest.overSince(speeds: [1514, 1649], quiet: [1499, 1499], now: 5, since: nil))
+        XCTAssertNil(QuietRest.overSince(speeds: [nil, nil], quiet: [1499, 1499], now: 5, since: 1))
+        XCTAssertEqual(QuietRest.overSince(speeds: [1514, 1650], quiet: [1499, 1499], now: 5, since: nil), 5)
+        XCTAssertEqual(QuietRest.overSince(speeds: [1900, 2000], quiet: [1499, 1499], now: 8, since: 5), 5)
+        func resting(over: Double?, now: Double, enabled: Bool = true) -> QuietRest.Step {
+            QuietRest.step(enabled: enabled, resting: true, coolSince: 0, overSince: over, heldSince: nil, now: now)
+        }
+        XCTAssertEqual(resting(over: nil, now: 1000), .nothing)
+        XCTAssertEqual(resting(over: 10, now: 13), .nothing)
+        XCTAssertEqual(resting(over: 10, now: 14), .hold)
+        XCTAssertEqual(resting(over: nil, now: 1000, enabled: false), .hold)   // switched off in the middle of a rest
+        XCTAssertEqual(Words.status(.quiet, left: nil, reason: nil, resting: true), "You decide: Quiet · fans resting")
+        XCTAssertEqual(Words.status(.quiet, left: "8 min left", reason: "during a call", resting: true),
+                       "You decide: Quiet (during a call) · fans resting · 8 min left")
+        XCTAssertEqual(Words.status(.cool, left: nil, reason: nil, resting: true), "You decide: Cool")
+    }
+
     func testMoreWords() {
         XCTAssertEqual(Words.status(.cool, left: "8 min left", reason: nil), "You decide: Cool · 8 min left")
         XCTAssertEqual(Words.status(.quiet, left: nil, reason: "during a call"), "You decide: Quiet (during a call)")

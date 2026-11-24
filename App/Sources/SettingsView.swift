@@ -194,6 +194,8 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                switchRow("Quiet lets the fans stop", isOn: model.quietRest, id: "quietRestToggle", tint: Palette.fanFill(scheme),
+                          words: "When the chip has been at \(Int(QuietRest.coolBelow))° or less for \(Int(QuietRest.coolFor)) seconds, Quiet gives the fans to the Mac, which stops them while it is cool. When the Mac runs them faster than your Quiet speed, the app takes them again and holds them there, for at least \(Int(QuietRest.holdAtLeast / 60)) minutes.") { model.setQuietRest($0) }
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -232,10 +234,11 @@ struct SettingsView: View {
         }
     }
 
-    private func switchRow(_ title: String, isOn: Bool, id: String, words: String, set: @escaping (Bool) -> Void) -> some View {
+    private func switchRow(_ title: String, isOn: Bool, id: String, tint: Color? = nil, words: String,
+                           set: @escaping (Bool) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Toggle(title, isOn: Binding(get: { isOn }, set: set))
-                .tint(Palette.macFill(scheme))
+                .tint(tint ?? Palette.macFill(scheme))
                 .accessibilityIdentifier(id)
             Text(words)
                 .font(.caption)
