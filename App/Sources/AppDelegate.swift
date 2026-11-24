@@ -9,9 +9,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var model: AppModel?
     private var status: StatusItemController?
     private var settingsWindow: NSWindow?
+    private var graphWindow: NSWindow?
     private var stopSignal: DispatchSourceSignal?
 
     private static let chooseName = Notification.Name("com.schabbauer.AMSFanMenu.choose")
+    private static let pretendWakeName = Notification.Name("com.schabbauer.AMSFanMenu.pretendWake")
+    private static let pretendBatteryName = Notification.Name("com.schabbauer.AMSFanMenu.pretendBattery")
+    private static let pretendCallName = Notification.Name("com.schabbauer.AMSFanMenu.pretendCall")
+
+    /// Tells the running copy something, then quits. A moment for the message to leave: quitting at once lost it.
+    private func tellRunningCopy(_ name: Notification.Name, _ word: String?) {
+        DistributedNotificationCenter.default().postNotificationName(name, object: word, userInfo: nil, deliverImmediately: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { NSApp.terminate(nil) }
+    }
 
     static func main() {
         let app = NSApplication.shared
@@ -31,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         // For checks: prints the fans and temperatures as the Mac reports them, then quits. Changes nothing.
         if arguments.contains("--read") {
-            print(AppModel(live: true).readout())
+            print(AppModel(readOnly: true).readout())
             Diary.finish()
             NSApp.terminate(nil)
             return
@@ -73,11 +83,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         // For checks: tells the running copy to switch to a choice ("--choose cool"), then quits.
         if let index = arguments.firstIndex(of: "--choose"), index + 1 < arguments.count {
-            DistributedNotificationCenter.default().postNotificationName(Self.chooseName, object: arguments[index + 1],
-                                                                         userInfo: nil, deliverImmediately: true)
-            // A moment for the message to leave: quitting at once lost it.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { NSApp.terminate(nil) }
+            tellRunningCopy(Self.chooseName, arguments[index + 1])
             return
+        }
+        // For checks: the running copy behaves as if the Mac slept and woke ("--pretend-wake"), as if the power
+        // cable were pulled ("--pretend-battery on", "off", or "real" to look at the real thing again), or as if
+        // a call were on ("--pretend-call on|off|real").
+        if arguments.contains("--pretend-wake") {
+            tellRunningCopy(Self.pretendWakeName, nil)
+            return
+        }
+        for (flag, name) in [("--pretend-battery", Self.pretendBatteryName), ("--pretend-call", Self.pretendCallName)] {
+            if let index = arguments.firstIndex(of: flag), index + 1 < arguments.count {
+                tellRunningCopy(name, arguments[index + 1])
+                return
+            }
         }
         // Switches "Open at login" on or off from outside, then quits: "--open-at-login on". "status" only looks.
         if let index = arguments.firstIndex(of: "--open-at-login"), index + 1 < arguments.count {
@@ -130,22 +150,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                    + (KeeperJob.openedByKeeper ? "opened by the keeper" : "opened by hand or by the Mac's login list") + keeperNote + "; "
                    + LoginItem.checkAtStart() + "; " + KeeperJob.stateLine() + "; "
                    + model.fans.map { "\($0.name) \(Words.turns($0.speed))" }.joined(separator: ", "))
-        status = StatusItemController(model: model) { [weak self] in self?.openSettings() }
+        status = StatusItemController(model: model, openSettings: { [weak self] in self?.openSettings() },
+                                      openGraph: { [weak self] in self?.openGraph() })
 
         let center = DistributedNotificationCenter.default()
         // Lets a check from outside open Settings, so the real window can be photographed.
         center.addObserver(self, selector: #selector(showSettings),
                            name: Notification.Name("com.schabbauer.AMSFanMenu.openSettings"), object: nil)
         center.addObserver(self, selector: #selector(chooseFromOutside(_:)), name: Self.chooseName, object: nil)
-        UNUserNotificationCenter.current().delegate = self
+        center.addObserver(self, selector: #selector(showGraph),
+                           name: Notification.Name("com.schabbauer.AMSFanMenu.openGraph"), object: nil)
+        center.addObserver(self, selector: #selector(pretendWake), name: Self.pretendWakeName, object: nil)
+        center.addObserver(self, selector: #selector(pretendBattery(_:)), name: Self.pretendBatteryName, object: nil)
+        center.addObserver(self, selector: #selector(pretendCall(_:)), name: Self.pretendCallName, object: nil)
+        let notes = UNUserNotificationCenter.current()
+        notes.delegate = self
+        // The heat notice carries a button.
+        let cool = UNNotificationAction(identifier: AppModel.switchToCoolAction, title: "Switch to Cool")
+        notes.setNotificationCategories([UNNotificationCategory(identifier: AppModel.heatCategory, actions: [cool], intentIdentifiers: [])])
+        if model.heatNotice { model.askForNotes() }
     }
 
     @objc private func showSettings() { openSettings() }
+    @objc private func showGraph() { openGraph() }
+    @objc private func pretendWake() { model?.pretendSleepAndWake() }
+    @objc private func pretendBattery(_ notification: Notification) { model?.pretend(battery: notification.object as? String ?? "real") }
+    @objc private func pretendCall(_ notification: Notification) { model?.pretend(call: notification.object as? String ?? "real") }
 
     @objc private func chooseFromOutside(_ notification: Notification) {
         guard let word = notification.object as? String, let choice = FanChoice(rawValue: word) else { return }
         Diary.note("Asked from outside to switch to \(choice.title)")
-        model?.choose(choice)
+        model?.choose(choice, by: .outside)
+    }
+
+    /// The large graph in its own window; it stays fresh while it is open.
+    private func openGraph() {
+        guard let model else { return }
+        let content = NSHostingController(rootView: GraphWindow(model: model, close: { [weak self] in
+            self?.graphWindow?.close()
+        }))
+        if let graphWindow {
+            graphWindow.contentViewController = content
+        } else {
+            let window = NSWindow(contentViewController: content)
+            window.title = "Graph"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            graphWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        graphWindow?.makeKeyAndOrderFront(nil)
+        graphWindow?.orderFrontRegardless()
     }
 
     private func openSettings() {
@@ -179,6 +235,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
     }
+
+    /// The heat notice's button "Switch to Cool".
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let action = response.actionIdentifier
+        DispatchQueue.main.async {
+            if action == AppModel.switchToCoolAction { self.model?.choose(.cool) }
+        }
+        completionHandler()
+    }
+}
+
+/// The large graph, kept fresh while its window is open.
+struct GraphWindow: View {
+    @ObservedObject var model: AppModel
+    var close: () -> Void = {}
+
+    var body: some View {
+        LargeGraph(history: model.history, now: model.historyNow, top: model.topSpeed, close: close)
+    }
 }
 
 /// Pictures of the panel and Settings with sample data, by day and by night, for checking the look.
@@ -195,6 +271,8 @@ enum Snapshots {
                 ("panel-cool", .sample(.cool)),
                 ("panel-myspeed", .sample(.mySpeed)),
                 ("panel-follow", .sample(.follow)),
+                ("panel-timed", .sample(.cool, lasting: .tenMinutes, left: "8 min left")),
+                ("panel-call", .sample(.quiet, reason: "during a call")),
                 ("panel-needs-ok", .sample(.automatic, note: needsOK, helper: .missing)),
                 ("panel-too-hot", .sample(.automatic, note: tooHot)),
             ]
@@ -202,12 +280,20 @@ enum Snapshots {
                 save(PanelView(model: model).background(back).environment(\.colorScheme, scheme),
                      folder.appendingPathComponent("\(name)-\(tag).png"))
             }
-            for (tab, name) in [(SettingsView.Tab.settings, "settings"), (.guide, "settings-guide"), (.news, "settings-news")] {
+            let sample = AppModel.sample(.automatic)
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-\(tag).png"))
+            save(LargeGraph(history: History(), now: sample.historyNow, top: sample.topSpeed, startSpan: .quarter).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-empty-\(tag).png"))
+            // The whole Settings tab, however long, so every switch can be seen in a picture.
+            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .settings).frame(height: 900).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-whole-\(tag).png"))
+            for (tab, name) in [(SettingsView.Tab.settings, "settings"), (.happened, "settings-happened"), (.guide, "settings-guide"), (.news, "settings-news")] {
                 save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: tab).background(back).environment(\.colorScheme, scheme),
                      folder.appendingPathComponent("\(name)-\(tag).png"))
             }
             // The whole guide and the signs, however long, so every line can be read in a picture.
-            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 2600).background(back)
+            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 4200).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-guide-whole-\(tag).png"))
             let dark = scheme == .dark
             for (name, decides) in [("mac-decides", false), ("you-decide", true)] {

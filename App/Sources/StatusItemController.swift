@@ -22,7 +22,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     static let autosaveName = "fanMenu"
     static let placeKey = "NSStatusItem Preferred Position \(autosaveName)"
 
-    init(model: AppModel, openSettings: @escaping () -> Void) {
+    init(model: AppModel, openSettings: @escaping () -> Void, openGraph: @escaping () -> Void) {
         self.model = model
         super.init()
         popover.behavior = .transient
@@ -30,6 +30,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let host = NSHostingController(rootView: PanelView(model: model, openSettings: { [weak self] in
             self?.popover.performClose(nil)
             openSettings()
+        }, openGraph: { [weak self] in
+            self?.popover.performClose(nil)
+            openGraph()
         }))
         // The panel grows and shrinks with its note and stays under the menu bar.
         host.sizingOptions = [.preferredContentSize]
@@ -52,6 +55,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         // Every redraw of a menu bar item costs the Mac a little, so the mark is drawn only when the
         // choice changes from "the Mac decides" to "you decide" or back.
         model.$choice.receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.redraw(force: false) }
+            .store(in: &bag)
+        // Hovering over the mark says the figures; they are refreshed with every reading (words only, no redraw).
+        model.$fans.map { _ in () }.merge(with: model.$chip.map { _ in () })
+            .throttle(for: .seconds(4), scheduler: RunLoop.main, latest: true)
             .sink { [weak self] _ in self?.redraw(force: false) }
             .store(in: &bag)
         redraw(force: true)
@@ -129,7 +137,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private func redraw(force: Bool) {
         guard let button = item?.button else { return }
         let choice = model.choice
-        button.toolTip = Words.hover(choice)
+        let words = Words.hover(choice, fans: model.fans.map { ($0.name, $0.speed) }, chip: model.chip)
+        if button.toolTip != words { button.toolTip = words }
         button.setAccessibilityLabel(Words.hover(choice))
         guard force || lastDrawn?.appDecides != choice.appDecides else { return }
         lastDrawn = choice

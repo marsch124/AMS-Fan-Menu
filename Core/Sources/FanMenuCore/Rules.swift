@@ -61,11 +61,12 @@ public enum FanPlan {
     public static let coolShare = 0.5
 
     /// How far from lowest (0) to top (1) the fans should run; nil = the Mac decides.
-    public static func share(choice: FanChoice, myPercent: Double, chip: Double?, start: Double, full: Double) -> Double? {
+    public static func share(choice: FanChoice, myPercent: Double, chip: Double?, start: Double, full: Double,
+                             quietPercent: Double = 0, coolPercent: Double = 50) -> Double? {
         switch choice {
         case .automatic: return nil
-        case .quiet: return 0
-        case .cool: return coolShare
+        case .quiet: return min(max(quietPercent, 0), 100) / 100
+        case .cool: return min(max(coolPercent, 0), 100) / 100
         case .full: return 1
         case .mySpeed: return min(max(myPercent, 0), 100) / 100
         case .follow:

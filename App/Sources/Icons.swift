@@ -144,6 +144,13 @@ enum Palette {
     static func warn(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 0.96, green: 0.76, blue: 0.36) : Color(red: 0.56, green: 0.35, blue: 0.0)
     }
+    /// Purple: the "What happened" list and its tab. It stands for nothing else.
+    static func story(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.72, green: 0.64, blue: 0.96) : Color(red: 0.42, green: 0.30, blue: 0.74)
+    }
+    static func storyFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.46, green: 0.36, blue: 0.78) : Color(red: 0.42, green: 0.30, blue: 0.74)
+    }
     /// The pale ground of a choice that is not in use, and of a note.
     static func pale(_ color: Color, _ scheme: ColorScheme) -> Color {
         color.opacity(scheme == .dark ? 0.20 : 0.13)

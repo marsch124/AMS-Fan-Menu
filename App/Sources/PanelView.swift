@@ -5,6 +5,7 @@ import SwiftUI
 struct PanelView: View {
     @ObservedObject var model: AppModel
     var openSettings: () -> Void = {}
+    var openGraph: () -> Void = {}
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -13,8 +14,10 @@ struct PanelView: View {
             if let note = model.note { noteCard(note) }
             readings
             choices
+            lastingLine
             mySpeed
             follow
+            graph
         }
         .padding(12)
         .frame(width: 300)
@@ -101,7 +104,7 @@ struct PanelView: View {
                 line([("Chip", Words.degrees(model.chip)), ("Graphics", Words.degrees(model.graphics)), ("Battery", Words.degrees(model.battery))])
                     .font(.callout).monospacedDigit().accessibilityIdentifier("temperatures")
             }
-            Text(Words.status(model.choice))
+            Text(Words.status(model.choice, left: model.leftWords, reason: model.reason))
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(model.choice.appDecides ? Palette.fan(scheme) : Palette.mac(scheme))
                 .accessibilityIdentifier("statusLine")
@@ -125,7 +128,7 @@ struct PanelView: View {
         return Button { model.choose(choice) } label: {
             VStack(spacing: 0) {
                 Text(title ?? choice.title).font(.callout.weight(.semibold)).monospacedDigit()
-                Text(choice.hint).font(.caption2).opacity(on ? 0.92 : 0.85)
+                Text(hint(choice)).font(.caption2).opacity(on ? 0.92 : 0.85)
             }
             .foregroundStyle(on ? Color.white : colours.words)
             .frame(maxWidth: .infinity)
@@ -134,9 +137,50 @@ struct PanelView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
-        .accessibilityLabel("\(title ?? choice.title), \(choice.hint)")
+        .accessibilityLabel("\(title ?? choice.title), \(hint(choice))")
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("choice-\(choice.rawValue)")
+    }
+
+    /// The few words under a button; Quiet and Cool say your own figure once you changed it in Settings.
+    private func hint(_ choice: FanChoice) -> String {
+        Presets.hint(choice, quiet: model.quietPercent, cool: model.coolPercent)
+    }
+
+    /// "For 10 min · 30 min · 1 hour · Until I change": how long a choice stays on before the Mac gets the
+    /// fans back. The time in use is full colour.
+    private var lastingLine: some View {
+        HStack(spacing: 5) {
+            Text("For").font(.caption).foregroundStyle(.secondary)
+            ForEach(Lasting.allCases, id: \.self) { one in
+                let on = model.lasting == one
+                Button { model.setLasting(one) } label: {
+                    Text(one.title).font(.caption.weight(.medium)).lineLimit(1).fixedSize()
+                        .foregroundStyle(on ? Color.white : Palette.fan(scheme))
+                        .padding(.horizontal, 7)
+                        .frame(height: 20)
+                        .background(on ? Palette.fanFill(scheme) : Palette.pale(Palette.fan(scheme), scheme),
+                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("A choice stays on for: \(one.title)")
+                .accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityIdentifier("lasting-\(one.rawValue)")
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityIdentifier("lastingLine")
+    }
+
+    /// The small graph of the last 15 minutes; a tap opens the large one.
+    private var graph: some View {
+        Button(action: openGraph) {
+            SmallGraph(history: model.history, now: model.historyNow, top: model.topSpeed)
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityLabel("Graph of temperature and fan speed, last 15 minutes. Opens the large graph.")
+        .accessibilityIdentifier("graphButton")
     }
 
     private var choices: some View {

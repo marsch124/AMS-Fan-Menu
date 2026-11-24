@@ -23,6 +23,7 @@
 		7E05DAF2EC59551E9A67C8B0 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1734D519EE8040313AB12FC /* AppDelegate.swift */; };
 		88F32C812C2222E482F34DE1 /* HelperInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60ACB0876CC3B6EE56B24138 /* HelperInstaller.swift */; };
 		9166D64B8533A2D4FEFFC37F /* HelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A5D45B473B7DB15537E6F6 /* HelperClient.swift */; };
+		92B7628C7ADE0A9C6B099E05 /* GraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF2B80D87147F60AED3EF7 /* GraphView.swift */; };
 		9FD97DC7480EC4520584DC2C /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 260410832741FBAF0F385014 /* AppIcon.icon */; };
 		A5592F3D49E9E5B38D1585D5 /* FanMenuCore in Frameworks */ = {isa = PBXBuildFile; productRef = B52C086EAFF9E130C82CAA6A /* FanMenuCore */; };
 		A7D63E475160F815A561BF1B /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B07A0BDB8337BAC297FA29 /* HelperProtocol.swift */; };
@@ -74,6 +75,7 @@
 		D1734D519EE8040313AB12FC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E400491271C407F7186ECBC6 /* Keeper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keeper.swift; sourceTree = "<group>"; };
 		EA0FB000BB04891C12499280 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F2DF2B80D87147F60AED3EF7 /* GraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +167,7 @@
 				D1734D519EE8040313AB12FC /* AppDelegate.swift */,
 				B371FE35724CE2116123A571 /* AppModel.swift */,
 				7340D8C2F3A9538E5F48587D /* Diary.swift */,
+				F2DF2B80D87147F60AED3EF7 /* GraphView.swift */,
 				014E7D68AE79B658F81F0A57 /* Guide.swift */,
 				11A5D45B473B7DB15537E6F6 /* HelperClient.swift */,
 				60ACB0876CC3B6EE56B24138 /* HelperInstaller.swift */,
@@ -283,6 +286,7 @@
 				7E05DAF2EC59551E9A67C8B0 /* AppDelegate.swift in Sources */,
 				1B5A7C6F8DE77B82D95D941F /* AppModel.swift in Sources */,
 				6378EC9820F27D12907B2924 /* Diary.swift in Sources */,
+				92B7628C7ADE0A9C6B099E05 /* GraphView.swift in Sources */,
 				4A28F2DC2553460D82031E30 /* Guide.swift in Sources */,
 				9166D64B8533A2D4FEFFC37F /* HelperClient.swift in Sources */,
 				88F32C812C2222E482F34DE1 /* HelperInstaller.swift in Sources */,
@@ -429,7 +433,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = D24ENP83QQ;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = App/Config/Info.plist;
@@ -437,7 +441,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu;
 				PRODUCT_NAME = "AMS Fan Menu";
 				SDKROOT = macosx;
@@ -452,7 +456,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = D24ENP83QQ;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = App/Config/Info.plist;
@@ -460,7 +464,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu;
 				PRODUCT_NAME = "AMS Fan Menu";
 				SDKROOT = macosx;

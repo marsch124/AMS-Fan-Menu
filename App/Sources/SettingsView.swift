@@ -36,7 +36,7 @@ enum LoginItem {
 /// The header and the bottom line (version, Quit, Done) stay on every tab.
 struct SettingsView: View {
     enum Tab: String, CaseIterable, Identifiable {
-        case settings = "Settings", guide = "How it works", news = "What’s new"
+        case settings = "Settings", happened = "What happened", guide = "How it works", news = "What’s new"
         var id: String { rawValue }
     }
 
@@ -108,6 +108,8 @@ struct SettingsView: View {
                 Button { picked = one } label: {
                     Text(one.rawValue)
                         .font(.callout.weight(selected ? .semibold : .regular))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .foregroundStyle(selected ? Color.white : Color.primary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 26)
@@ -125,6 +127,7 @@ struct SettingsView: View {
     private func fill(_ tab: Tab) -> Color {
         switch tab {
         case .settings: return Palette.macFill(scheme)
+        case .happened: return Palette.storyFill(scheme)
         case .guide: return Palette.fanFill(scheme)
         case .news: return Palette.heatFill(scheme)
         }
@@ -133,6 +136,7 @@ struct SettingsView: View {
     @ViewBuilder private var page: some View {
         switch tab {
         case .settings: settingsPage
+        case .happened: happenedPage
         case .guide: guidePage
         case .news: newsPage
         }
@@ -182,6 +186,28 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Your speeds").font(.headline).foregroundStyle(Palette.fan(scheme))
+                speedRow("Quiet", percent: model.quietPercent, range: Presets.quietRange, id: "quietSlider") { model.setQuietPercent($0) }
+                speedRow("Cool", percent: model.coolPercent, range: Presets.coolRange, id: "coolSlider") { model.setCoolPercent($0) }
+                Text("What the Quiet and Cool buttons mean. 0 % is each fan’s lowest speed, 100 % its top.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("By itself").font(.headline).foregroundStyle(Palette.mac(scheme))
+                switchRow("Heat notice", isOn: model.heatNotice, id: "heatNoticeToggle",
+                          words: "While the Mac decides: a notification when the chip has been at \(Int(HeatNotice.limit))° or more for \(Int(HeatNotice.patience / 60)) minutes, with the button “Switch to Cool”.") { model.setHeatNotice($0) }
+                switchRow("Quiet during calls", isOn: model.quietInCalls, id: "quietInCallsToggle",
+                          words: "When an app has used the microphone for \(Int(CallQuiet.startAfter)) seconds, the app switches to Quiet; \(Int(CallQuiet.endAfter)) seconds after the microphone is free, your choice from before comes back. Any app that listens counts, not only calls.") { model.setQuietInCalls($0) }
+                switchRow("On battery: the Mac decides", isOn: model.batteryRule, id: "batteryToggle",
+                          words: "When the power cable is pulled, the fans go back to the Mac. With the cable back in, your choice comes back.") { model.setBatteryRule($0) }
+                switchRow("Choice back after sleep", isOn: model.backAfterSleep, id: "backAfterSleepToggle",
+                          words: "Sleep always hands the fans to the Mac. With this on, your choice comes back about 5 seconds after the Mac wakes. Restart and quit still hand the fans to the Mac.") { model.setBackAfterSleep($0) }
+            }
+
             VStack(alignment: .leading, spacing: 3) {
                 Text("Safety").font(.headline).foregroundStyle(Palette.heat(scheme))
                 Text("Quit, sleep and restart always hand the fans back to the Mac. So does a processor core at \(Int(HeatGuard.limit))° or more for \(Int(HeatGuard.patience)) seconds, except in Full.")
@@ -192,6 +218,74 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("settingsPage")
+    }
+
+    /// "Quiet 0 %" with its slider: the figure right beside its name.
+    private func speedRow(_ name: String, percent: Double, range: ClosedRange<Double>, id: String,
+                          set: @escaping (Double) -> Void) -> some View {
+        HStack(spacing: 8) {
+            (Text(name + " ").foregroundColor(.secondary) + Text("\(Int(percent)) %").fontWeight(.semibold))
+                .font(.callout).monospacedDigit()
+                .frame(width: 84, alignment: .leading)
+            DragSlider(value: percent, range: range, step: Presets.step, tint: Palette.fanFill(scheme), id: id,
+                       label: "\(name) speed in per cent", set: set)
+        }
+    }
+
+    private func switchRow(_ title: String, isOn: Bool, id: String, words: String, set: @escaping (Bool) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(title, isOn: Binding(get: { isOn }, set: set))
+                .tint(Palette.macFill(scheme))
+                .accessibilityIdentifier(id)
+            Text(words)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: What happened
+
+    private static let clock: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+    private static let day: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.dateFormat = "d MMM"
+        return formatter
+    }()
+
+    /// "20:12" today, "23 Nov 20:12" on another day.
+    private func when(_ time: Double) -> String {
+        let date = Date(timeIntervalSince1970: time)
+        let clock = Self.clock.string(from: date)
+        return Calendar.current.isDateInToday(date) ? clock : Self.day.string(from: date) + " " + clock
+    }
+
+    private var happenedPage: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("The last \(HappenedLog.shown) things the app did, newest first.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            let lines = HappenedLog.forShow(model.happened)
+            if lines.isEmpty {
+                Text("Nothing yet. Pick a choice in the panel and it shows up here.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(lines) { line in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(when(line.time)).font(.callout).monospacedDigit().foregroundStyle(Palette.story(scheme))
+                        .frame(width: 92, alignment: .leading)
+                    Text(line.text).font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("happenedPage")
     }
 
     // MARK: How it works, with the signs
@@ -235,6 +329,12 @@ struct SettingsView: View {
         case .blue: Circle().fill(Palette.fanFill(scheme)).frame(width: 12, height: 12)
         case .coral: Circle().fill(Palette.heatFill(scheme)).frame(width: 12, height: 12)
         case .amber: Circle().fill(Palette.warn(scheme)).frame(width: 12, height: 12)
+        case .dashedLine:
+            Path { path in
+                path.move(to: CGPoint(x: 15, y: 1))
+                path.addLine(to: CGPoint(x: 15, y: 17))
+            }
+            .stroke(Color.secondary, style: StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
         }
     }
 
