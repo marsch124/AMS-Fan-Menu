@@ -18,6 +18,8 @@ struct PanelView: View {
         }
         .padding(12)
         .frame(width: 300)
+        // No keyboard ring around the first button: the panel is used with the pointer.
+        .focusEffectDisabled()
         .accessibilityIdentifier("panel")
     }
 

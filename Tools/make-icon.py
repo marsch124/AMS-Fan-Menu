@@ -60,11 +60,11 @@ def fan_svg_paths(size):
 def write_layered_icon(folder):
     shutil.rmtree(folder, ignore_errors=True)
     os.makedirs(os.path.join(folder, "Assets"))
-    d, (cx, cy, hr) = fan_svg_paths(CANVAS)
-    sw = STROKE * CANVAS * GLYPH / 24
+    # The layered icon fills whatever it is given, so the line drawing is turned into one filled outline first.
+    d = subprocess.run(["swift", os.path.join(ROOT, "Tools", "fan-outline.swift"), str(CANVAS), str(GLYPH), str(STROKE)],
+                       check=True, capture_output=True, text=True).stdout.strip()
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{CANVAS}" height="{CANVAS}" viewBox="0 0 {CANVAS} {CANVAS}">'
-           f'<g fill="none" stroke="#FFFFFF" stroke-width="{sw:.3f}" stroke-linecap="round" stroke-linejoin="round">'
-           f'<path d="{d}"/><circle cx="{cx:.3f}" cy="{cy:.3f}" r="{hr:.3f}"/></g></svg>\n')
+           f'<path fill="#FFFFFF" fill-rule="nonzero" d="{d}"/></svg>\n')
     with open(os.path.join(folder, "Assets", "fan.svg"), "w") as f:
         f.write(svg)
 

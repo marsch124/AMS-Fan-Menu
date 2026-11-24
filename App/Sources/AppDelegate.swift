@@ -36,6 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        // For checks: prints what would run with the Mac's deepest rights when you allow fan control.
+        if arguments.contains("--helper-script") {
+            print(HelperInstaller.installScript(tool: HelperInstaller.bundledTool, order: HelperInstaller.bundledOrder ?? "missing"))
+            NSApp.terminate(nil)
+            return
+        }
         // For checks: tells the running copy to switch to a choice ("--choose cool"), then quits.
         if let index = arguments.firstIndex(of: "--choose"), index + 1 < arguments.count {
             DistributedNotificationCenter.default().postNotificationName(Self.chooseName, object: arguments[index + 1],

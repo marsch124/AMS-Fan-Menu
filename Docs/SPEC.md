@@ -25,7 +25,7 @@ From top to bottom:
 
 1. Header: app tile, name, version, and a gear that opens Settings.
 2. Fan speeds, for example "Left 1,776 - Right 1,868", live, updated once a second while the panel is open.
-3. Temperatures, for example "Chip 72 deg - Graphics 64 deg - Battery 36 deg" (Celsius).
+3. Temperatures, for example "Chip 72° · Graphics 64° · Battery 36°" (Celsius).
    - Chip is the average of the processor core sensors Tp01, Tp05, Tp09, Tp0D, Tp0H, Tp0L, Tp0P, Tp0T, Tp0X, Tp0b.
    - Graphics is the average of Tg05, Tg0D, Tg0L, Tg0T.
    - Battery is the average of TB1T, TB2T.
@@ -92,6 +92,7 @@ Only one copy of the app runs: the copy that started first stays.
 - Command line checks:
   - `--snapshots <folder>`: pictures of the panel, settings and menu bar states, day and night, with sample data.
   - `--read`: prints the fans and temperatures, then quits.
+  - `--helper-script` prints the exact steps that run with the Mac's deepest rights when fan control is allowed, then quits. It changes nothing.
   - `--choose <automatic|quiet|cool|full|mySpeed|follow>`: tells the running copy to switch, then quits.
   - `--open-at-login on|off|status`.
   - Distributed notifications: `com.schabbauer.AMSFanMenu.togglePanel` and `com.schabbauer.AMSFanMenu.openSettings`.
@@ -120,3 +121,7 @@ Until the owner has approved the helper once, these are not proven at 0.1:
 ## Version history
 
 - 0.1 (build 1, 24 Nov 2026): first version. Menu bar fan mark, panel with live fan speeds and temperatures, six choices, one-time helper approval, safety rules, Settings with guide and What's new, diary, check hooks, rule tests.
+
+## Icon files
+
+The fan is drawn once as numbers (three blades around a hub on a 24-point grid) and used in three places: `App/Sources/Icons.swift` (panel, menu bar, signs), `Tools/make-icon.py` with `Tools/fan-outline.swift` (the app icon; the line is turned into a filled outline because the Mac's layered icon fills whatever it is given), and the mark `fan` in the AMS Icon Library.
