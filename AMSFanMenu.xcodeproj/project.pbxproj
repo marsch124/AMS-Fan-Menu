@@ -1,0 +1,578 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0C9A4D070F4B6EE0BED0754C /* PanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E381AF0DCCEDE131E579CF /* PanelView.swift */; };
+		12F6A377B7FDC771A40C9988 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDC54FF6955FE17F710B843 /* StatusItemController.swift */; };
+		1B5A7C6F8DE77B82D95D941F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B371FE35724CE2116123A571 /* AppModel.swift */; };
+		37FD362DE38911991F731B3E /* Icons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B041923C50BF54B05A65F0 /* Icons.swift */; };
+		46750AC24E465CB6FC066B06 /* Keeper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E400491271C407F7186ECBC6 /* Keeper.swift */; };
+		4A28F2DC2553460D82031E30 /* Guide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 014E7D68AE79B658F81F0A57 /* Guide.swift */; };
+		4F2AFDC4D89A0E667F10B06F /* FanHelper in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 7C30102C1BB8A6CC92BAF97A /* FanHelper */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		51323F9044C5066D661B9B75 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147B00BFBADC1DBE35086F0F /* main.swift */; };
+		6378EC9820F27D12907B2924 /* Diary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7340D8C2F3A9538E5F48587D /* Diary.swift */; };
+		6CE279C2C05FD04AAB548705 /* com.schabbauer.AMSFanMenu.helper.plist in Resources */ = {isa = PBXBuildFile; fileRef = 004CE58BEE18D91F2876D749 /* com.schabbauer.AMSFanMenu.helper.plist */; };
+		6E73DB41FD927910BE568E8B /* FanMenuCore in Frameworks */ = {isa = PBXBuildFile; productRef = FF4ECECDAF00901CCFBC2FFF /* FanMenuCore */; };
+		72477E8AFC9568C78C2DB1B0 /* SMC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424BD8B037E2F1FC6581CA6F /* SMC.swift */; };
+		791C1DF8C7BA232120B95649 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B07A0BDB8337BAC297FA29 /* HelperProtocol.swift */; };
+		7E05DAF2EC59551E9A67C8B0 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1734D519EE8040313AB12FC /* AppDelegate.swift */; };
+		88F32C812C2222E482F34DE1 /* HelperInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60ACB0876CC3B6EE56B24138 /* HelperInstaller.swift */; };
+		9166D64B8533A2D4FEFFC37F /* HelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A5D45B473B7DB15537E6F6 /* HelperClient.swift */; };
+		9FD97DC7480EC4520584DC2C /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 260410832741FBAF0F385014 /* AppIcon.icon */; };
+		A5592F3D49E9E5B38D1585D5 /* FanMenuCore in Frameworks */ = {isa = PBXBuildFile; productRef = B52C086EAFF9E130C82CAA6A /* FanMenuCore */; };
+		A7D63E475160F815A561BF1B /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B07A0BDB8337BAC297FA29 /* HelperProtocol.swift */; };
+		E8461CEFB530843EB9CAD9F0 /* SMC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424BD8B037E2F1FC6581CA6F /* SMC.swift */; };
+		F451377C2A068F00EBA0FC56 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0FB000BB04891C12499280 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1BF611BEAC5C21376E09385F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A01A6414705B459354C381C7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5CEE9070CD364C81E62E309;
+			remoteInfo = FanHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		16D0016FBAF60E6A70054EEA /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/HelperTools;
+			dstSubfolderSpec = 1;
+			files = (
+				4F2AFDC4D89A0E667F10B06F /* FanHelper in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		004CE58BEE18D91F2876D749 /* com.schabbauer.AMSFanMenu.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.schabbauer.AMSFanMenu.helper.plist; sourceTree = "<group>"; };
+		014E7D68AE79B658F81F0A57 /* Guide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Guide.swift; sourceTree = "<group>"; };
+		11A5D45B473B7DB15537E6F6 /* HelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperClient.swift; sourceTree = "<group>"; };
+		147B00BFBADC1DBE35086F0F /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		260410832741FBAF0F385014 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		2DDC54FF6955FE17F710B843 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
+		30B07A0BDB8337BAC297FA29 /* HelperProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProtocol.swift; sourceTree = "<group>"; };
+		424BD8B037E2F1FC6581CA6F /* SMC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMC.swift; sourceTree = "<group>"; };
+		60ACB0876CC3B6EE56B24138 /* HelperInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperInstaller.swift; sourceTree = "<group>"; };
+		71E381AF0DCCEDE131E579CF /* PanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelView.swift; sourceTree = "<group>"; };
+		7340D8C2F3A9538E5F48587D /* Diary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diary.swift; sourceTree = "<group>"; };
+		79B041923C50BF54B05A65F0 /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
+		7AF9AF2E70B44886FD6777A7 /* AMSFanMenu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AMSFanMenu.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C30102C1BB8A6CC92BAF97A /* FanHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = FanHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		82299DF1756A5EB5B2F30129 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Core; sourceTree = SOURCE_ROOT; };
+		B371FE35724CE2116123A571 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		D1734D519EE8040313AB12FC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E400491271C407F7186ECBC6 /* Keeper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keeper.swift; sourceTree = "<group>"; };
+		EA0FB000BB04891C12499280 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		08571C4A0CC95F19D3EF5CD2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6E73DB41FD927910BE568E8B /* FanMenuCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E39D45ED33C9525E3C055F29 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5592F3D49E9E5B38D1585D5 /* FanMenuCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1603EE11762C9931C9E2AF96 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				27EC75B9D64BDCF2BACE8A69 /* Resources */,
+				FA4A7B54416BC7A01ACA713B /* Sources */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		19107E053B3B7974471730F5 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				30B07A0BDB8337BAC297FA29 /* HelperProtocol.swift */,
+				424BD8B037E2F1FC6581CA6F /* SMC.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		27EC75B9D64BDCF2BACE8A69 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				260410832741FBAF0F385014 /* AppIcon.icon */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		34790EEC3F8BCC80780274C3 /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				004CE58BEE18D91F2876D749 /* com.schabbauer.AMSFanMenu.helper.plist */,
+				147B00BFBADC1DBE35086F0F /* main.swift */,
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		58092D564F8E4280F483CE9B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7AF9AF2E70B44886FD6777A7 /* AMSFanMenu.app */,
+				7C30102C1BB8A6CC92BAF97A /* FanHelper */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		71673337A1D8D9DAC3AFA989 = {
+			isa = PBXGroup;
+			children = (
+				1603EE11762C9931C9E2AF96 /* App */,
+				34790EEC3F8BCC80780274C3 /* Helper */,
+				BA2007E8EF9D533B5D9A1955 /* Packages */,
+				19107E053B3B7974471730F5 /* Shared */,
+				58092D564F8E4280F483CE9B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BA2007E8EF9D533B5D9A1955 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				82299DF1756A5EB5B2F30129 /* Core */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		FA4A7B54416BC7A01ACA713B /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				D1734D519EE8040313AB12FC /* AppDelegate.swift */,
+				B371FE35724CE2116123A571 /* AppModel.swift */,
+				7340D8C2F3A9538E5F48587D /* Diary.swift */,
+				014E7D68AE79B658F81F0A57 /* Guide.swift */,
+				11A5D45B473B7DB15537E6F6 /* HelperClient.swift */,
+				60ACB0876CC3B6EE56B24138 /* HelperInstaller.swift */,
+				79B041923C50BF54B05A65F0 /* Icons.swift */,
+				E400491271C407F7186ECBC6 /* Keeper.swift */,
+				71E381AF0DCCEDE131E579CF /* PanelView.swift */,
+				EA0FB000BB04891C12499280 /* SettingsView.swift */,
+				2DDC54FF6955FE17F710B843 /* StatusItemController.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B081070DC47C6D751BE10D51 /* AMSFanMenu */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A6BE2EE8376B3FE23BF0EB41 /* Build configuration list for PBXNativeTarget "AMSFanMenu" */;
+			buildPhases = (
+				DC0DA01838344DE174B92CFF /* Sources */,
+				A87138F50834F4CD69AEF8A3 /* Resources */,
+				E39D45ED33C9525E3C055F29 /* Frameworks */,
+				16D0016FBAF60E6A70054EEA /* Embed Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0108827EF765909F5D73D846 /* PBXTargetDependency */,
+			);
+			name = AMSFanMenu;
+			packageProductDependencies = (
+				B52C086EAFF9E130C82CAA6A /* FanMenuCore */,
+			);
+			productName = AMSFanMenu;
+			productReference = 7AF9AF2E70B44886FD6777A7 /* AMSFanMenu.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B5CEE9070CD364C81E62E309 /* FanHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 673D5579A5B2405A60CCAC3C /* Build configuration list for PBXNativeTarget "FanHelper" */;
+			buildPhases = (
+				E3CCC1704ABD73668F05736F /* Sources */,
+				08571C4A0CC95F19D3EF5CD2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FanHelper;
+			packageProductDependencies = (
+				FF4ECECDAF00901CCFBC2FFF /* FanMenuCore */,
+			);
+			productName = FanHelper;
+			productReference = 7C30102C1BB8A6CC92BAF97A /* FanHelper */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A01A6414705B459354C381C7 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B081070DC47C6D751BE10D51 = {
+						DevelopmentTeam = D24ENP83QQ;
+						ProvisioningStyle = Manual;
+					};
+					B5CEE9070CD364C81E62E309 = {
+						DevelopmentTeam = D24ENP83QQ;
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 1D4DF86B63832B349B31055D /* Build configuration list for PBXProject "AMSFanMenu" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 71673337A1D8D9DAC3AFA989;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6CA5124208486688A5FD7A7D /* XCLocalSwiftPackageReference "Core" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 58092D564F8E4280F483CE9B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B081070DC47C6D751BE10D51 /* AMSFanMenu */,
+				B5CEE9070CD364C81E62E309 /* FanHelper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A87138F50834F4CD69AEF8A3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9FD97DC7480EC4520584DC2C /* AppIcon.icon in Resources */,
+				6CE279C2C05FD04AAB548705 /* com.schabbauer.AMSFanMenu.helper.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DC0DA01838344DE174B92CFF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7E05DAF2EC59551E9A67C8B0 /* AppDelegate.swift in Sources */,
+				1B5A7C6F8DE77B82D95D941F /* AppModel.swift in Sources */,
+				6378EC9820F27D12907B2924 /* Diary.swift in Sources */,
+				4A28F2DC2553460D82031E30 /* Guide.swift in Sources */,
+				9166D64B8533A2D4FEFFC37F /* HelperClient.swift in Sources */,
+				88F32C812C2222E482F34DE1 /* HelperInstaller.swift in Sources */,
+				A7D63E475160F815A561BF1B /* HelperProtocol.swift in Sources */,
+				37FD362DE38911991F731B3E /* Icons.swift in Sources */,
+				46750AC24E465CB6FC066B06 /* Keeper.swift in Sources */,
+				0C9A4D070F4B6EE0BED0754C /* PanelView.swift in Sources */,
+				E8461CEFB530843EB9CAD9F0 /* SMC.swift in Sources */,
+				F451377C2A068F00EBA0FC56 /* SettingsView.swift in Sources */,
+				12F6A377B7FDC771A40C9988 /* StatusItemController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E3CCC1704ABD73668F05736F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				791C1DF8C7BA232120B95649 /* HelperProtocol.swift in Sources */,
+				72477E8AFC9568C78C2DB1B0 /* SMC.swift in Sources */,
+				51323F9044C5066D661B9B75 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0108827EF765909F5D73D846 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B5CEE9070CD364C81E62E309 /* FanHelper */;
+			targetProxy = 1BF611BEAC5C21376E09385F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		36CD77A6FFF1CE5E55B9B345 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = D24ENP83QQ;
+				ENABLE_HARDENED_RUNTIME = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_CODE_SIGN_FLAGS = "--identifier com.schabbauer.AMSFanMenu.helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu.helper;
+				PRODUCT_NAME = com.schabbauer.AMSFanMenu.helper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		3B47B377C74C8F62B5BF06ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		45B5191B217DC51EEB5EBB8A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = D24ENP83QQ;
+				ENABLE_HARDENED_RUNTIME = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_CODE_SIGN_FLAGS = "--identifier com.schabbauer.AMSFanMenu.helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu.helper;
+				PRODUCT_NAME = com.schabbauer.AMSFanMenu.helper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5FCF13A2C425893069E49D6C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D24ENP83QQ;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = App/Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu;
+				PRODUCT_NAME = "AMS Fan Menu";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		9E1FE5AFA73033E6853B1507 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D24ENP83QQ;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = App/Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.schabbauer.AMSFanMenu;
+				PRODUCT_NAME = "AMS Fan Menu";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		DD85F1E172E8C3C703E1926F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1D4DF86B63832B349B31055D /* Build configuration list for PBXProject "AMSFanMenu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3B47B377C74C8F62B5BF06ED /* Debug */,
+				DD85F1E172E8C3C703E1926F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		673D5579A5B2405A60CCAC3C /* Build configuration list for PBXNativeTarget "FanHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36CD77A6FFF1CE5E55B9B345 /* Debug */,
+				45B5191B217DC51EEB5EBB8A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A6BE2EE8376B3FE23BF0EB41 /* Build configuration list for PBXNativeTarget "AMSFanMenu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9E1FE5AFA73033E6853B1507 /* Debug */,
+				5FCF13A2C425893069E49D6C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		6CA5124208486688A5FD7A7D /* XCLocalSwiftPackageReference "Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Core;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B52C086EAFF9E130C82CAA6A /* FanMenuCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FanMenuCore;
+		};
+		FF4ECECDAF00901CCFBC2FFF /* FanMenuCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FanMenuCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A01A6414705B459354C381C7 /* Project object */;
+}

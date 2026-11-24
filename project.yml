@@ -1,0 +1,78 @@
+name: AMSFanMenu
+options:
+  bundleIdPrefix: com.schabbauer
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+packages:
+  FanMenuCore:
+    path: Core
+targets:
+  AMSFanMenu:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+      - Shared
+      - path: App/Resources
+        excludes:
+          - AppIcon.icns
+      - path: Helper/com.schabbauer.AMSFanMenu.helper.plist
+        buildPhase: resources
+    info:
+      path: App/Config/Info.plist
+      properties:
+        CFBundleDisplayName: AMS Fan Menu
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        CFBundleIconFile: AppIcon
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.utilities
+    settings:
+      base:
+        PRODUCT_NAME: AMS Fan Menu
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSFanMenu
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: D24ENP83QQ
+        ENABLE_HARDENED_RUNTIME: NO
+    dependencies:
+      - package: FanMenuCore
+      # The helper travels inside the app; "Allow fan control…" copies it to where it runs.
+      - target: FanHelper
+        embed: true
+        codeSign: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Library/HelperTools
+  FanHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - Helper/main.swift
+      - Shared
+    settings:
+      base:
+        PRODUCT_NAME: com.schabbauer.AMSFanMenu.helper
+        PRODUCT_BUNDLE_IDENTIFIER: com.schabbauer.AMSFanMenu.helper
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: D24ENP83QQ
+        ENABLE_HARDENED_RUNTIME: NO
+        # Without this the signature takes its name from the file name minus ".helper" — the app's own name.
+        OTHER_CODE_SIGN_FLAGS: --identifier com.schabbauer.AMSFanMenu.helper
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: FanMenuCore
+schemes:
+  AMS Fan Menu:
+    build:
+      targets:
+        AMSFanMenu: all
+    run:
+      config: Release
