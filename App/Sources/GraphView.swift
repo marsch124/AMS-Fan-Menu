@@ -62,6 +62,11 @@ private struct PlotDrawing: View {
     var levels: [Level] = []
     /// The usual range on this Mac: a soft grey band.
     var usual: ClosedRange<Double>?
+    /// Pale stretches behind everything: the time a choice other than Automatic was on.
+    var stretches: [Stretch] = []
+    /// Where the pointer is (seconds since 1970) and the reading nearest to it, if there is one near enough.
+    var point: Double?
+    var pointSample: Sample?
     let inset: CGFloat = 4
     @Environment(\.colorScheme) private var scheme
 
@@ -71,6 +76,12 @@ private struct PlotDrawing: View {
             let xs = marks.map { inset + CGFloat(Plot.x(time: $0.time, now: now, span: span)) * (size.width - 2 * inset) }
             let shown = levels.filter { scale.contains($0.degrees) }.sorted { $0.degrees > $1.degrees }
             ZStack(alignment: .topLeading) {
+                ForEach(stretches.indices, id: \.self) { i in
+                    let left = inset + CGFloat(Plot.x(time: stretches[i].from, now: now, span: span)) * (size.width - 2 * inset)
+                    let right = inset + CGFloat(Plot.x(time: stretches[i].to, now: now, span: span)) * (size.width - 2 * inset)
+                    Rectangle().fill(Palette.pale(Palette.fan(scheme), scheme))
+                        .frame(width: max(right - left, 1), height: size.height).offset(x: left)
+                }
                 if let usual, usual.upperBound > scale.lowerBound, usual.lowerBound < scale.upperBound {
                     let top = height(usual.upperBound, size), bottom = height(usual.lowerBound, size)
                     Rectangle().fill(Color.primary.opacity(0.08))
@@ -97,6 +108,21 @@ private struct PlotDrawing: View {
                 ForEach(lines.indices, id: \.self) { i in
                     linePath(pieces(samples, now: now, span: span, scale: scale, size: size, inset: inset, value: lines[i].value))
                         .stroke(lines[i].color, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                }
+                if let point {
+                    let moment = pointSample?.time ?? point
+                    let x = inset + CGFloat(Plot.x(time: moment, now: now, span: span)) * (size.width - 2 * inset)
+                    Path { p in p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: size.height)) }
+                        .stroke(Color.primary.opacity(0.45), lineWidth: 1)
+                    if let pointSample {
+                        ForEach(lines.indices, id: \.self) { i in
+                            if let v = lines[i].value(pointSample) {
+                                let y = size.height - inset - CGFloat(Plot.y(v, in: scale)) * (size.height - 2 * inset)
+                                Circle().fill(Color.primary.opacity(0.45)).frame(width: 5, height: 5)
+                                    .position(x: x, y: y)
+                            }
+                        }
+                    }
                 }
                 if titles {
                     ForEach(Array(visibleTitles(xs).enumerated()), id: \.offset) { _, item in
@@ -230,10 +256,20 @@ struct LargeGraph: View {
     var heatNotice: Double? = HeatNotice.limit
     var close: () -> Void = {}
     var startSpan: GraphSpan = .hour
+    /// For pictures: which graphs show (nil = the remembered pick, kept in UserDefaults under `shownGraphs`).
+    var shown: [GraphPick]?
+    /// For pictures: the moment the pointer is at, in seconds since 1970 (nil = where the pointer really is).
+    var pointAt: Double?
     @State private var span: GraphSpan?
+    @State private var picked: [GraphPick]?
+    @State private var hover: Double?
     @Environment(\.colorScheme) private var scheme
 
     private var current: GraphSpan { span ?? startSpan }
+    private var shownNow: [GraphPick] {
+        picked ?? shown ?? ShownGraphs.parse(UserDefaults.standard.string(forKey: "shownGraphs"))
+    }
+    private var pointing: Double? { pointAt ?? hover }
 
     var body: some View {
         let samples = history.samples(last: current.seconds, now: now)
@@ -243,27 +279,29 @@ struct LargeGraph: View {
         let fanLines = (0..<max(fans, 1)).map { i in
             PlotLine(color: Palette.fan(scheme).opacity(i == 0 ? 1 : 0.55), value: { $0.speeds.indices.contains(i) ? $0.speeds[i] : nil })
         }
+        let picks = shownNow
+        let heights = ShownGraphs.heights(for: picks, room: 570, spacing: 8)
+        let reach = Plot.pointReach(span: current.seconds)
+        let near = pointing.flatMap { Plot.nearest(samples, to: $0, within: reach) }
+        let clock = pointing.map { "at " + Words.clock(near?.time ?? $0, seconds: current == .quarter) }
         VStack(alignment: .leading, spacing: 8) {
             Text("Temperature and fan speed").font(.title3.weight(.semibold))
             HStack(spacing: 6) { ForEach(GraphSpan.allCases, id: \.self) { tab($0) } }
-            ForEach(Sensor.allCases, id: \.self) { sensor in
-                temperature(sensor, samples: samples, marks: marks)
+            HStack(spacing: 6) {
+                Text("Show").font(.caption).foregroundStyle(.secondary)
+                ForEach(GraphPick.allCases, id: \.self) { showButton($0, on: picks.contains($0)) }
             }
-            PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 10) {
-                        Text("Fan speed").font(.caption.weight(.semibold)).foregroundStyle(Palette.fan(scheme))
-                        if fans == 2 { legendItem("Left", 1); legendItem("Right", 0.55) }
-                    }
-                    axisAndDrawing(figures: [speedScale.upperBound, (speedScale.lowerBound + speedScale.upperBound) / 2, speedScale.lowerBound].map { Words.turns($0) }) {
-                        PlotDrawing(samples: samples, marks: marks, lines: fanLines, scale: speedScale, now: now,
-                                    span: current.seconds, grid: true, titles: true)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(picks.enumerated()), id: \.element) { index, pick in
+                    if let sensor = pick.sensor {
+                        temperature(sensor, samples: samples, marks: marks, height: heights[index], near: near, clock: clock)
+                    } else {
+                        fanPlot(samples: samples, marks: marks, scale: speedScale, lines: fanLines, fans: fans,
+                                height: heights[index], near: near, clock: clock)
                     }
                 }
-                .padding(.horizontal, 8).padding(.vertical, 6)
             }
-            .frame(height: 118)
-            .accessibilityIdentifier("plot-fans")
+            .frame(height: 570, alignment: .top)
             HStack {
                 Text(spanAgo).font(.caption2).foregroundStyle(.secondary)
                 Spacer()
@@ -286,7 +324,7 @@ struct LargeGraph: View {
             }
         }
         .padding(14)
-        .frame(width: 560, height: 734, alignment: .topLeading)
+        .frame(width: 560, height: 768, alignment: .topLeading)
         .accessibilityIdentifier("largeGraph")
     }
 
@@ -311,7 +349,8 @@ struct LargeGraph: View {
 
     /// One temperature: its name with the figure now and the usual range beside it, then the line over its
     /// level lines and the grey band of what is usual on this Mac.
-    private func temperature(_ sensor: Sensor, samples: [Sample], marks: [ChoiceMark]) -> some View {
+    private func temperature(_ sensor: Sensor, samples: [Sample], marks: [ChoiceMark], height: Double,
+                             near: Sample?, clock: String?) -> some View {
         let values = samples.compactMap { sensor.value(in: $0) }
         let scale = Levels.scale(sensor, samples)
         let usual = Usual.band(history.samples.compactMap { sensor.value(in: $0) })
@@ -322,8 +361,10 @@ struct LargeGraph: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(sensor.title).font(.caption.weight(.semibold)).foregroundStyle(Palette.heat(scheme))
-                    Text(Words.degrees(values.last)).font(.caption.weight(.semibold).monospacedDigit())
+                    Text(Words.degrees(clock == nil ? values.last : near.flatMap { sensor.value(in: $0) }))
+                        .font(.caption.weight(.semibold).monospacedDigit())
                         .accessibilityIdentifier("now-\(sensor.rawValue)")
+                    if let clock { Text(clock).font(.caption).foregroundStyle(.secondary) }
                     if usual != nil {
                         RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.16)).frame(width: 12, height: 8)
                             .padding(.leading, 4)
@@ -337,17 +378,66 @@ struct LargeGraph: View {
                     PlotDrawing(samples: samples, marks: marks,
                                 lines: [PlotLine(color: Palette.heat(scheme), value: { sensor.value(in: $0) })],
                                 scale: scale, now: now, span: current.seconds, grid: true,
-                                levels: Levels.of(sensor, fullSeenAt: fullSeenAt, heatNotice: heatNotice), usual: usual)
+                                levels: Levels.of(sensor, fullSeenAt: fullSeenAt, heatNotice: heatNotice), usual: usual,
+                                point: pointing, pointSample: near)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
         }
-        // The chip graph carries the most level lines, so it is the tallest.
-        .frame(height: sensor == .chip ? 172 : 128)
+        // The chip graph carries the most level lines, so it is the tallest (see GraphPick.weight).
+        .frame(height: height)
         .accessibilityIdentifier("plot-\(sensor.rawValue)")
     }
 
-    /// The figures of the scale at the left (top, middle, bottom), then the drawing.
+    /// The fan speed: the legend (and, while pointing, both speeds at that moment), then the lines over the
+    /// pale stretches in which a choice was on.
+    private func fanPlot(samples: [Sample], marks: [ChoiceMark], scale: ClosedRange<Double>, lines: [PlotLine],
+                         fans: Int, height: Double, near: Sample?, clock: String?) -> some View {
+        PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 10) {
+                    Text("Fan speed").font(.caption.weight(.semibold)).foregroundStyle(Palette.fan(scheme))
+                    if fans == 2 { legendItem("Left", 1); legendItem("Right", 0.55) }
+                    if let clock {
+                        let speeds = near?.speeds ?? []
+                        let figures = fans == 2
+                            ? "Left \(Words.turns(speeds.first)) \u{00B7} Right \(Words.turns(speeds.count > 1 ? speeds[1] : nil))"
+                            : Words.turns(speeds.first)
+                        Text(figures + " ").font(.caption.weight(.semibold).monospacedDigit())
+                            + Text(clock).font(.caption).foregroundColor(.secondary)
+                    }
+                }
+                axisAndDrawing(figures: [scale.upperBound, (scale.lowerBound + scale.upperBound) / 2, scale.lowerBound].map { Words.turns($0) }) {
+                    PlotDrawing(samples: samples, marks: marks, lines: lines, scale: scale, now: now,
+                                span: current.seconds, grid: true, titles: true,
+                                stretches: history.stretches(last: current.seconds, now: now),
+                                point: pointing, pointSample: near)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6)
+        }
+        .frame(height: height)
+        .accessibilityIdentifier("plot-fans")
+    }
+
+    /// One small pick button of the "Show" row: full colour when its graph shows, pale when it is hidden.
+    private func showButton(_ pick: GraphPick, on: Bool) -> some View {
+        let fill = pick == .fans ? Palette.fanFill(scheme) : Palette.heatFill(scheme)
+        return Button {
+            let next = ShownGraphs.toggled(pick, in: shownNow)
+            picked = next
+            if shown == nil { UserDefaults.standard.set(ShownGraphs.stored(next), forKey: "shownGraphs") }
+        } label: {
+            Text(pick.title).font(.caption.weight(on ? .semibold : .regular))
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .padding(.horizontal, 9).frame(height: 22)
+                .background(RoundedRectangle(cornerRadius: 8).fill(on ? fill : Color.primary.opacity(0.07)))
+        }
+        .buttonStyle(PressStyle()).accessibilityIdentifier("show-\(pick.rawValue)")
+    }
+
+    /// The figures of the scale at the left (top, middle, bottom), then the drawing; the pointer over the
+    /// drawing sets the moment all graphs point at.
     private func axisAndDrawing<Drawing: View>(figures: [String], @ViewBuilder drawing: () -> Drawing) -> some View {
         HStack(spacing: 0) {
             VStack(alignment: .trailing) {
@@ -357,7 +447,18 @@ struct LargeGraph: View {
                 }
             }
             .padding(.trailing, 4).frame(width: 40)
-            drawing()
+            drawing().overlay(
+                GeometryReader { geo in
+                    Color.clear.contentShape(Rectangle()).onContinuousHover { phase in
+                        switch phase {
+                        case .active(let place):
+                            let width = max(geo.size.width - 8, 1)
+                            hover = Plot.time(share: Double((place.x - 4) / width), now: now, span: current.seconds)
+                        case .ended:
+                            hover = nil
+                        }
+                    }
+                })
         }
     }
 

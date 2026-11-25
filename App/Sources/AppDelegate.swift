@@ -295,12 +295,20 @@ enum Snapshots {
                      folder.appendingPathComponent("\(name)-\(tag).png"))
             }
             let sample = AppModel.sample(.automatic)
-            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed).background(back)
+            let first = ShownGraphs.first
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: first).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-\(tag).png"))
-            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, fullSeenAt: 97).background(back)
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, fullSeenAt: 97, shown: first).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-seen-\(tag).png"))
-            save(LargeGraph(history: History(), now: sample.historyNow, top: sample.topSpeed, startSpan: .quarter).background(back)
+            save(LargeGraph(history: History(), now: sample.historyNow, top: sample.topSpeed, startSpan: .quarter, shown: first).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-empty-\(tag).png"))
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: GraphPick.allCases).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-six-\(tag).png"))
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: [.chip, .fans]).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-two-\(tag).png"))
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: first,
+                            pointAt: sample.historyNow - 20 * 60).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-point-\(tag).png"))
             // The whole Settings tab, however long, so every switch can be seen in a picture.
             save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .settings).frame(height: 900).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-whole-\(tag).png"))
@@ -329,7 +337,7 @@ enum Snapshots {
         for (scheme, tag) in [(ColorScheme.light, "day"), (ColorScheme.dark, "night")] {
             let back = scheme == .dark ? Color(white: 0.16) : Color(white: 0.96)
             for span in GraphSpan.allCases {
-                save(LargeGraph(history: history, now: last.time, top: 5776, fullSeenAt: seen, startSpan: span).background(back)
+                save(LargeGraph(history: history, now: last.time, top: 5776, fullSeenAt: seen, startSpan: span, shown: ShownGraphs.first).background(back)
                         .environment(\.colorScheme, scheme), folder.appendingPathComponent("real-\(span.rawValue)-\(tag).png"))
             }
         }
