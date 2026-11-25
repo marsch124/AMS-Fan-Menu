@@ -18,12 +18,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// The app that had the keyboard when the panel opened; it gets it back when the panel closes.
     private var previousApp: NSRunningApplication?
     private var outsideClicks: Any?
+    private let openSettingsAction: () -> Void
+    private let openGraphAction: () -> Void
 
     static let autosaveName = "fanMenu"
     static let placeKey = "NSStatusItem Preferred Position \(autosaveName)"
 
     init(model: AppModel, openSettings: @escaping () -> Void, openGraph: @escaping () -> Void) {
         self.model = model
+        self.openSettingsAction = openSettings
+        self.openGraphAction = openGraph
         super.init()
         popover.behavior = .transient
         popover.delegate = self
@@ -76,7 +80,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         item = fresh
         if let button = item.button {
             button.target = self
-            button.action = #selector(toggle)
+            button.action = #selector(clicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityIdentifier("fanMenuStatusItem")
         }
     }
@@ -106,6 +111,46 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             self.redraw(force: true)
         }
     }
+
+    /// A left click opens the panel; a right click or control-click shows the short menu.
+    @objc private func clicked() {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            if popover.isShown { popover.performClose(nil) }
+            item.menu = makeMenu()
+            item.button?.performClick(nil)
+            item.menu = nil
+        } else {
+            toggle()
+        }
+    }
+
+    /// Titles of the right-click menu, in order (a separator between the second and the third).
+    static let rightMenuTitles = ["Automatic", "Cool for 10 min", "Graphs\u{2026}", "Settings\u{2026}"]
+
+    private func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        let t = Self.rightMenuTitles
+        let auto = NSMenuItem(title: t[0], action: #selector(rightAutomatic), keyEquivalent: "")
+        auto.state = model.choice.appDecides ? .off : .on
+        auto.setAccessibilityIdentifier("fanMenuRightAutomatic")
+        let cool = NSMenuItem(title: t[1], action: #selector(rightCool), keyEquivalent: "")
+        cool.setAccessibilityIdentifier("fanMenuRightCool")
+        let graphs = NSMenuItem(title: t[2], action: #selector(rightGraphs), keyEquivalent: "")
+        graphs.setAccessibilityIdentifier("fanMenuRightGraphs")
+        let settings = NSMenuItem(title: t[3], action: #selector(rightSettings), keyEquivalent: "")
+        settings.setAccessibilityIdentifier("fanMenuRightSettings")
+        for entry in [auto, cool, .separator(), graphs, settings] {
+            entry.target = self
+            menu.addItem(entry)
+        }
+        return menu
+    }
+
+    @objc private func rightAutomatic() { model.choose(.automatic) }
+    @objc private func rightCool() { model.choose(.cool, by: .outside, forSeconds: 600) }
+    @objc private func rightGraphs() { openGraphAction() }
+    @objc private func rightSettings() { openSettingsAction() }
 
     /// Opens or closes the panel. The panel does not come to the front: the app you work in keeps the keyboard.
     @objc func toggle() {

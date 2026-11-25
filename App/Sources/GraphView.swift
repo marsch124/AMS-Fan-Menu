@@ -71,6 +71,8 @@ private struct PlotDrawing: View {
     /// Where the pointer is (seconds since 1970) and the reading nearest to it, if there is one near enough.
     var point: Double?
     var pointSample: Sample?
+    /// 0.7: notices that were sent: an amber dot on the curve at each one's moment.
+    var notices: [NoticeMark] = []
     let inset: CGFloat = 4
     @Environment(\.colorScheme) private var scheme
 
@@ -118,6 +120,13 @@ private struct PlotDrawing: View {
                 ForEach(lines.indices, id: \.self) { i in
                     linePath(pieces(samples, now: now, span: span, scale: scale, size: size, inset: inset, value: lines[i].value))
                         .stroke(lines[i].color, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                }
+                ForEach(notices.indices, id: \.self) { i in
+                    let x = inset + CGFloat(Plot.x(time: notices[i].time, now: now, span: span)) * (size.width - 2 * inset)
+                    let reading = Plot.nearest(samples, to: notices[i].time, within: History.every * 3)
+                        .flatMap { sample in lines.compactMap { $0.value(sample) }.max() }
+                    let y = reading.map { size.height - inset - CGFloat(Plot.y($0, in: scale)) * (size.height - 2 * inset) } ?? 4
+                    Circle().fill(Palette.warn(scheme)).frame(width: 7, height: 7).position(x: x, y: y)
                 }
                 if let point {
                     let moment = pointSample?.time ?? point
@@ -399,6 +408,12 @@ struct LargeGraph: View {
         if sensor == .chip, fullSeenAt == nil { extras.append("fans at full in Automatic: not seen yet") }
         let charging = sensor == .battery ? history.chargingStretches(last: current.seconds, now: now) : []
         let chargingNow = samples.last?.charging == true
+        // 0.7: pointing at a notice's moment: its words stand in place of the clock time.
+        let noticeMarks = history.notices(sensor, last: current.seconds, now: now)
+        let pointedNotice = pointing.flatMap { moment in
+            noticeMarks.filter { abs($0.time - moment) <= Plot.pointReach(span: current.seconds) }
+                .min { abs($0.time - moment) < abs($1.time - moment) }
+        }
         return PlotBox(hasData: values.count >= 2, empty: "No \(sensor.title.lowercased()) readings yet for this time") {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -411,7 +426,11 @@ struct LargeGraph: View {
                             .font(.caption.weight(.semibold).monospacedDigit())
                             .accessibilityIdentifier("now-\(sensor.rawValue)")
                     }
-                    if let clock { Text(clock).font(.caption).foregroundStyle(.secondary) }
+                    if let pointedNotice, paused == nil {
+                        Text("\u{00B7} " + pointedNotice.words).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.tail)
+                            .accessibilityIdentifier("notice-\(sensor.rawValue)")
+                    } else if let clock { Text(clock).font(.caption).foregroundStyle(.secondary) }
                     if usual != nil {
                         RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.16)).frame(width: 12, height: 8)
                             .padding(.leading, 4)
@@ -433,7 +452,7 @@ struct LargeGraph: View {
                                 scale: scale, now: now, span: current.seconds, grid: true,
                                 levels: Levels.of(sensor, fullSeenAt: fullSeenAt, heatNotice: heatNotice), usual: usual,
                                 charging: charging, pauses: history.pauses(last: current.seconds, now: now),
-                                point: pointing, pointSample: near)
+                                point: pointing, pointSample: near, notices: noticeMarks)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -447,7 +466,12 @@ struct LargeGraph: View {
     /// pale stretches in which a choice was on.
     private func fanPlot(samples: [Sample], marks: [ChoiceMark], scale: ClosedRange<Double>, lines: [PlotLine],
                          fans: Int, height: Double, near: Sample?, clock: String?, paused: Pause?) -> some View {
-        PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
+        let fanMarks = history.fanNotices(last: current.seconds, now: now)
+        let pointedNotice = pointing.flatMap { moment in
+            fanMarks.filter { abs($0.time - moment) <= Plot.pointReach(span: current.seconds) }
+                .min { abs($0.time - moment) < abs($1.time - moment) }
+        }
+        return PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 10) {
                     Text("Fan speed").font(.caption.weight(.semibold)).foregroundStyle(Palette.fan(scheme))
@@ -460,8 +484,9 @@ struct LargeGraph: View {
                         let figures = fans == 2
                             ? "Left \(Words.turns(speeds.first)) \u{00B7} Right \(Words.turns(speeds.count > 1 ? speeds[1] : nil))"
                             : Words.turns(speeds.first)
-                        Text(figures + " ").font(.caption.weight(.semibold).monospacedDigit())
-                            + Text(clock).font(.caption).foregroundColor(.secondary)
+                        (Text(figures + " ").font(.caption.weight(.semibold).monospacedDigit())
+                            + Text(pointedNotice.map { "\u{00B7} " + $0.words } ?? clock).font(.caption).foregroundColor(.secondary))
+                            .lineLimit(1).truncationMode(.tail)
                     }
                 }
                 axisAndDrawing(figures: [scale.upperBound, (scale.lowerBound + scale.upperBound) / 2, scale.lowerBound].map { Words.turns($0) }) {
@@ -469,7 +494,7 @@ struct LargeGraph: View {
                                 span: current.seconds, grid: true, titles: true,
                                 stretches: history.stretches(last: current.seconds, now: now),
                                 pauses: history.pauses(last: current.seconds, now: now),
-                                point: pointing, pointSample: near)
+                                point: pointing, pointSample: near, notices: fanMarks)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -562,6 +587,9 @@ extension History {
         history.pause(from: start + 40 * 60, to: start + 48 * 60, why: Pause.asleep)
         history.mark("Cool", at: coolAt)
         history.mark("Automatic", at: autoAt)
+        history.notice("Heat notice: chip 90\u{00B0} or more for 5 min", sensor: .chip, at: now - 20 * 60)
+        history.notice("Right fan fell short: 2,100 of 3,600 asked", sensor: nil, at: now - 10 * 60)
+        history.notice("Battery above 35\u{00B0} for 10 min", sensor: .battery, at: now - 40 * 60)
         return history
     }
 }
