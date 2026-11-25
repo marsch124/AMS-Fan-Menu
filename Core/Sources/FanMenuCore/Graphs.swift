@@ -134,3 +134,54 @@ public extension History {
         return out
     }
 }
+
+public extension History {
+    /// 0.6: the stretches in the last `seconds` in which the battery was charging (title "charging"): readings
+    /// that say charging, one after the other, form a stretch from the first to the last of them. A reading that
+    /// says not charging or says nothing, or a gap between two readings, ends it. Clipped to the window.
+    func chargingStretches(last seconds: Double, now: Double) -> [Stretch] {
+        let edge = now - seconds
+        var out: [Stretch] = []
+        var first: Double?, last = 0.0
+        var previous: Sample?
+        func close() {
+            if let from = first {
+                let start = max(from, edge), end = min(last, now)
+                if end >= start { out.append(Stretch(from: start, to: end, title: "charging")) }
+            }
+            first = nil
+        }
+        for sample in samples where sample.time <= now {
+            if let previous, Plot.isGap(previous, sample) { close() }
+            if sample.charging == true {
+                if first == nil { first = sample.time }
+                last = sample.time
+            } else {
+                close()
+            }
+            previous = sample
+        }
+        close()
+        return out.filter { $0.to > edge }
+    }
+}
+
+public extension Plot {
+    /// 0.6: where a pause starts and ends across a graph (0 = the oldest edge, 1 = now), clipped to the window;
+    /// nil when it lies outside it.
+    static func pauseShares(_ pause: Pause, now: Double, span: Double) -> ClosedRange<Double>? {
+        let edge = now - span
+        guard pause.to > edge, pause.from < now, pause.to > pause.from else { return nil }
+        return x(time: max(pause.from, edge), now: now, span: span)...x(time: min(pause.to, now), now: now, span: span)
+    }
+
+    /// 0.6: the scale of a temperature the small graph shows other than the chip: whole tens that hold the
+    /// readings, at least 10 degrees apart; 20...50 when there are none.
+    static func tensScale(_ values: [Double]) -> ClosedRange<Double> {
+        guard let low = values.min(), let high = values.max() else { return 20...50 }
+        let bottom = (low / 10).rounded(.down) * 10
+        var top = (high / 10).rounded(.up) * 10
+        if top - bottom < 10 { top = bottom + 10 }
+        return bottom...top
+    }
+}

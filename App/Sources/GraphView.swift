@@ -64,6 +64,10 @@ private struct PlotDrawing: View {
     var usual: ClosedRange<Double>?
     /// Pale stretches behind everything: the time a choice other than Automatic was on.
     var stretches: [Stretch] = []
+    /// 0.6: pale teal stretches behind the line: the time the battery was charging (Battery graph only).
+    var charging: [Stretch] = []
+    /// 0.6: the stretches without readings whose reason is known; each gets its word in the middle of the gap.
+    var pauses: [Pause] = []
     /// Where the pointer is (seconds since 1970) and the reading nearest to it, if there is one near enough.
     var point: Double?
     var pointSample: Sample?
@@ -80,6 +84,12 @@ private struct PlotDrawing: View {
                     let left = inset + CGFloat(Plot.x(time: stretches[i].from, now: now, span: span)) * (size.width - 2 * inset)
                     let right = inset + CGFloat(Plot.x(time: stretches[i].to, now: now, span: span)) * (size.width - 2 * inset)
                     Rectangle().fill(Palette.pale(Palette.fan(scheme), scheme))
+                        .frame(width: max(right - left, 1), height: size.height).offset(x: left)
+                }
+                ForEach(charging.indices, id: \.self) { i in
+                    let left = inset + CGFloat(Plot.x(time: charging[i].from, now: now, span: span)) * (size.width - 2 * inset)
+                    let right = inset + CGFloat(Plot.x(time: charging[i].to, now: now, span: span)) * (size.width - 2 * inset)
+                    Rectangle().fill(Palette.pale(Palette.power(scheme), scheme))
                         .frame(width: max(right - left, 1), height: size.height).offset(x: left)
                 }
                 if let usual, usual.upperBound > scale.lowerBound, usual.lowerBound < scale.upperBound {
@@ -121,6 +131,17 @@ private struct PlotDrawing: View {
                                 Circle().fill(Color.primary.opacity(0.45)).frame(width: 5, height: 5)
                                     .position(x: x, y: y)
                             }
+                        }
+                    }
+                }
+                // 0.6: a gap says why: the word in the middle of it, when the gap is wide enough to hold it.
+                ForEach(pauses.indices, id: \.self) { i in
+                    if let shares = Plot.pauseShares(pauses[i], now: now, span: span) {
+                        let left = inset + CGFloat(shares.lowerBound) * (size.width - 2 * inset)
+                        let wide = CGFloat(shares.upperBound - shares.lowerBound) * (size.width - 2 * inset)
+                        if wide >= 56 {
+                            Text(pauses[i].why).font(.caption2).foregroundStyle(Color.secondary).fixedSize()
+                                .frame(width: wide).offset(x: left, y: size.height * 0.62)
                         }
                     }
                 }
@@ -223,14 +244,24 @@ struct SmallGraph: View {
     var sensor: Sensor = .chip
     @Environment(\.colorScheme) private var scheme
 
+    /// The words before "last 15 minutes": which temperature the coral line is.
+    private var name: String {
+        switch sensor {
+        case .battery: return "Battery"
+        case .palm: return "Case"
+        default: return "Chip"
+        }
+    }
+
     var body: some View {
         let span = GraphSpan.quarter.seconds
         let samples = history.samples(last: span, now: now)
+        let scale = sensor == .chip ? Plot.temperatureScale(samples) : Plot.tensScale(samples.compactMap { sensor.value(in: $0) })
         VStack(alignment: .leading, spacing: 3) {
             PlotBox(hasData: samples.count >= 2, empty: "The graph fills as time passes") {
                 ZStack {
                     PlotDrawing(samples: samples, marks: history.marks(last: span, now: now),
-                                lines: [PlotLine(color: Palette.heat(scheme), value: { $0.chip })], scale: Plot.temperatureScale(samples),
+                                lines: [PlotLine(color: Palette.heat(scheme), value: { sensor.value(in: $0) })], scale: scale,
                                 now: now, span: span)
                     PlotDrawing(samples: samples, marks: [],
                                 lines: [PlotLine(color: Palette.fan(scheme), value: Plot.meanSpeed)],
@@ -238,7 +269,7 @@ struct SmallGraph: View {
                 }
             }
             .frame(height: 58)
-            Text("Last 15 minutes · tap for the large graph").font(.caption).foregroundStyle(.secondary)
+            Text("\(name), last 15 minutes · tap for the large graph").font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -284,7 +315,8 @@ struct LargeGraph: View {
         let picks = shownNow
         let heights = ShownGraphs.heights(for: picks, room: 570, spacing: 8)
         let reach = Plot.pointReach(span: current.seconds)
-        let near = pointing.flatMap { Plot.nearest(samples, to: $0, within: reach) }
+        let paused = pointing.flatMap { history.pause(at: $0) }
+        let near = paused != nil ? nil : pointing.flatMap { Plot.nearest(samples, to: $0, within: reach) }
         let clock = pointing.map { "at " + Words.clock(near?.time ?? $0, seconds: current == .quarter) }
         VStack(alignment: .leading, spacing: 8) {
             Text("Temperature and fan speed").font(.title3.weight(.semibold))
@@ -296,10 +328,10 @@ struct LargeGraph: View {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(picks.enumerated()), id: \.element) { index, pick in
                     if let sensor = pick.sensor {
-                        temperature(sensor, samples: samples, marks: marks, height: heights[index], near: near, clock: clock)
+                        temperature(sensor, samples: samples, marks: marks, height: heights[index], near: near, clock: clock, paused: paused)
                     } else {
                         fanPlot(samples: samples, marks: marks, scale: speedScale, lines: fanLines, fans: fans,
-                                height: heights[index], near: near, clock: clock)
+                                height: heights[index], near: near, clock: clock, paused: paused)
                     }
                 }
             }
@@ -352,20 +384,27 @@ struct LargeGraph: View {
     /// One temperature: its name with the figure now and the usual range beside it, then the line over its
     /// level lines and the grey band of what is usual on this Mac.
     private func temperature(_ sensor: Sensor, samples: [Sample], marks: [ChoiceMark], height: Double,
-                             near: Sample?, clock: String?) -> some View {
+                             near: Sample?, clock: String?, paused: Pause?) -> some View {
         let values = samples.compactMap { sensor.value(in: $0) }
         let scale = Levels.scale(sensor, samples)
         let usual = Usual.band(history.samples.compactMap { sensor.value(in: $0) })
         var extras: [String] = []
         if let usual { extras.append(Usual.words(usual)) }
         if sensor == .chip, fullSeenAt == nil { extras.append("fans at full in Automatic: not seen yet") }
+        let charging = sensor == .battery ? history.chargingStretches(last: current.seconds, now: now) : []
+        let chargingNow = samples.last?.charging == true
         return PlotBox(hasData: values.count >= 2, empty: "No \(sensor.title.lowercased()) readings yet for this time") {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(sensor.title).font(.caption.weight(.semibold)).foregroundStyle(Palette.heat(scheme))
-                    Text(Words.degrees(clock == nil ? values.last : near.flatMap { sensor.value(in: $0) }))
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .accessibilityIdentifier("now-\(sensor.rawValue)")
+                    if let paused {
+                        Text(paused.why).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("now-\(sensor.rawValue)")
+                    } else {
+                        Text(Words.degrees(clock == nil ? values.last : near.flatMap { sensor.value(in: $0) }))
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .accessibilityIdentifier("now-\(sensor.rawValue)")
+                    }
                     if let clock { Text(clock).font(.caption).foregroundStyle(.secondary) }
                     if usual != nil {
                         RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.16)).frame(width: 12, height: 8)
@@ -375,12 +414,19 @@ struct LargeGraph: View {
                         Text(extras.joined(separator: " \u{00B7} ")).font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(1).minimumScaleFactor(0.8)
                     }
+                    if !charging.isEmpty {
+                        RoundedRectangle(cornerRadius: 2).fill(Palette.power(scheme).opacity(0.35)).frame(width: 12, height: 8)
+                            .padding(.leading, 4)
+                        Text(chargingNow ? "charging now" : "charging").font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1).fixedSize()
+                    }
                 }
                 axisAndDrawing(figures: [scale.upperBound, (scale.lowerBound + scale.upperBound) / 2, scale.lowerBound].map { Words.degrees($0) }) {
                     PlotDrawing(samples: samples, marks: marks,
                                 lines: [PlotLine(color: Palette.heat(scheme), value: { sensor.value(in: $0) })],
                                 scale: scale, now: now, span: current.seconds, grid: true,
                                 levels: Levels.of(sensor, fullSeenAt: fullSeenAt, heatNotice: heatNotice), usual: usual,
+                                charging: charging, pauses: history.pauses(last: current.seconds, now: now),
                                 point: pointing, pointSample: near)
                 }
             }
@@ -394,13 +440,16 @@ struct LargeGraph: View {
     /// The fan speed: the legend (and, while pointing, both speeds at that moment), then the lines over the
     /// pale stretches in which a choice was on.
     private func fanPlot(samples: [Sample], marks: [ChoiceMark], scale: ClosedRange<Double>, lines: [PlotLine],
-                         fans: Int, height: Double, near: Sample?, clock: String?) -> some View {
+                         fans: Int, height: Double, near: Sample?, clock: String?, paused: Pause?) -> some View {
         PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 10) {
                     Text("Fan speed").font(.caption.weight(.semibold)).foregroundStyle(Palette.fan(scheme))
                     if fans == 2 { legendItem("Left", 1); legendItem("Right", 0.55) }
-                    if let clock {
+                    if let paused {
+                        Text(paused.why + " ").font(.caption).foregroundStyle(.secondary)
+                            + Text(clock ?? "").font(.caption).foregroundColor(.secondary)
+                    } else if let clock {
                         let speeds = near?.speeds ?? []
                         let figures = fans == 2
                             ? "Left \(Words.turns(speeds.first)) \u{00B7} Right \(Words.turns(speeds.count > 1 ? speeds[1] : nil))"
@@ -413,6 +462,7 @@ struct LargeGraph: View {
                     PlotDrawing(samples: samples, marks: marks, lines: lines, scale: scale, now: now,
                                 span: current.seconds, grid: true, titles: true,
                                 stretches: history.stretches(last: current.seconds, now: now),
+                                pauses: history.pauses(last: current.seconds, now: now),
                                 point: pointing, pointSample: near)
                 }
             }
@@ -494,12 +544,16 @@ extension History {
                 let k = 1 - exp(-(time - autoAt) / (total / 10))
                 temp = 50 + 22 * k + wobble; speed = 2100 + wobble * 40
             }
+            // 0.6: charging for the first 25 minutes; asleep for 8 minutes at 40 minutes in (wide enough for its word in the one-hour graph) (no readings then).
+            if time >= start + 40 * 60 && time < start + 48 * 60 { time += History.every; continue }
             history.add(Sample(time: time, chip: temp, speeds: [speed, speed + 60],
                                graphics: temp - 8 + cos(time / 53), battery: 29 + (time - start) / total * 4 + sin(time / 91) * 0.4,
                                storage: 38 + (temp - 50) / 8 + sin(time / 140) * 0.5, palm: 30 + (temp - 50) / 12,
-                               power: 14 + (temp - 50) * 1.3 + sin(time / 23) * 3))
+                               power: 14 + (temp - 50) * 1.3 + sin(time / 23) * 3,
+                               charging: time < start + 25 * 60))
             time += History.every
         }
+        history.pause(from: start + 40 * 60, to: start + 48 * 60, why: Pause.asleep)
         history.mark("Cool", at: coolAt)
         history.mark("Automatic", at: autoAt)
         return history

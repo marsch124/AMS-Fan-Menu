@@ -64,3 +64,46 @@ final class GraphsTests: XCTestCase {
         XCTAssertTrue(none.stretches(last: 600, now: 1000).isEmpty)   // ended before the window
     }
 }
+
+final class Graphs06Tests: XCTestCase {
+    private func history(_ flags: [Bool?], gapAfter: Int? = nil) -> History {
+        var h = History()
+        var t = 1000.0
+        for (i, flag) in flags.enumerated() {
+            h.add(Sample(time: t, chip: 50, speeds: [2000], charging: flag))
+            t += History.every + (i == gapAfter ? 60 : 0)
+        }
+        return h
+    }
+
+    func testChargingStretches() {
+        let now = 1000 + 5 * 9.0
+        XCTAssertEqual(history([true, true, true, false, false]).chargingStretches(last: 600, now: now),
+                       [Stretch(from: 1000, to: 1010, title: "charging")])
+        XCTAssertEqual(history([false, true, true, nil, true]).chargingStretches(last: 600, now: now).count, 2)
+        XCTAssertEqual(history([true, true, true, true], gapAfter: 1).chargingStretches(last: 600, now: now + 60).count, 2)
+        XCTAssertEqual(history([false, true, true]).chargingStretches(last: 600, now: 1010),
+                       [Stretch(from: 1005, to: 1010, title: "charging")])
+        XCTAssertEqual(history([true, true, true, true]).chargingStretches(last: 10, now: 1015),
+                       [Stretch(from: 1005, to: 1015, title: "charging")])
+        XCTAssertTrue(history([false, nil, false]).chargingStretches(last: 600, now: 1010).isEmpty)
+    }
+
+    func testPauseShares() {
+        let p = Pause(from: 700, to: 800, why: Pause.asleep)
+        XCTAssertEqual(Plot.pauseShares(p, now: 1000, span: 400)?.lowerBound ?? -1, 0.25, accuracy: 0.0001)
+        XCTAssertEqual(Plot.pauseShares(p, now: 1000, span: 400)?.upperBound ?? -1, 0.5, accuracy: 0.0001)
+        let clipped = Plot.pauseShares(p, now: 1000, span: 250)    // edge at 750
+        XCTAssertEqual(clipped?.lowerBound ?? -1, 0, accuracy: 0.0001)
+        XCTAssertEqual(clipped?.upperBound ?? -1, 0.2, accuracy: 0.0001)
+        XCTAssertNil(Plot.pauseShares(p, now: 1000, span: 100))
+        XCTAssertNil(Plot.pauseShares(p, now: 600, span: 100))
+    }
+
+    func testSmallGraphScale() {
+        XCTAssertEqual(Plot.tensScale([29.2, 33.8]), 20...40)
+        XCTAssertEqual(Plot.tensScale([31, 31.5]), 30...40)
+        XCTAssertEqual(Plot.tensScale([30, 30]), 30...40)
+        XCTAssertEqual(Plot.tensScale([]), 20...50)
+    }
+}
