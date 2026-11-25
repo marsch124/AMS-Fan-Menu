@@ -1,4 +1,4 @@
-# AMS Fan Menu 0.6 (build 9, 25 Nov 2026) - Specification
+# AMS Fan Menu 0.7 (build 10, 25 Nov 2026) - Specification
 
 ## Purpose
 
@@ -17,7 +17,7 @@ It is installed directly on the Mac, not through TestFlight, because a sandboxed
 - A hand-drawn fan mark only, no figure.
 - Black (white at night) means the Mac decides. Blue means your choice is on: AMS Fan Menu runs the fans (any choice except Automatic), also while Quiet lets the fans rest (0.3).
 - Hover text: "Fans: the Mac decides" or "Fans: you decide (Cool)" (with the name of the choice in use). From 0.2 a second line gives the figures, for example "Left 1,776 · Right 1,868 · Chip 72°". The mark itself stays without a figure.
-- A click opens the panel. The panel does not take the keyboard away from the app in front.
+- A left click opens the panel. From 0.7 a right click or control-click shows a short menu instead (see "Right-click menu (0.7)"). The panel does not take the keyboard away from the app in front.
 - The item has the autosave name "fanMenu". If the Mac moves its saved place to the far left (a value above 1000) and the item is out of sight for 10 seconds, the app puts it back at its home place, 190 points from the right edge.
 
 ## Panel
@@ -139,6 +139,8 @@ Thin solid flat lines across a temperature graph, each with its words at the rig
 
 While the Mac decides (Automatic): when the chip has been at the level or more for 5 minutes, a notification says so, with the button "Switch to Cool". At most once every 30 minutes. Switch in Settings "Heat notice", on by default.
 
+From 0.7 the notice also names the app working hardest (see "The app working hardest (0.7)").
+
 From 0.5 a row "From" under the switch picks the level: 80°, 85°, 90° or 95° (default 90°, as before; `HeatNotice.levels`; setting `heatLevel`). The 5 minutes count from that level, and the amber line in the Chip graph moves with it ("Heat notice 85°"). With the switch off there is no amber line in the Chip graph.
 
 ## Battery heat notice (0.5)
@@ -257,6 +259,7 @@ Only one copy of the app runs: the copy that started first stays.
   - `--pretend-battery-temp 37|real` (0.5): makes the app use that battery temperature for the battery heat notice, or the real reading with `real`. For tests.
   - `--pretend-wake`, `--pretend-battery on|off`, `--pretend-call on|off` (0.2): send a distributed notification to the running copy that acts as if the Mac woke, the power cable was pulled or put back, or a call began or ended. For tests.
   - Distributed notifications: `com.schabbauer.AMSFanMenu.togglePanel` and `com.schabbauer.AMSFanMenu.openSettings`.
+  - From 0.7: `--busiest`, `--right-menu-items`, and the distributed notification `com.schabbauer.AMSFanMenu.checkFans` (see "0.7: notices, fan check-up, dots, right-click menu").
 
 ## For other apps (0.2)
 
@@ -282,6 +285,51 @@ The notification `com.schabbauer.AMSFanMenu.openGraph` opens the large graph win
 - If the Mac takes a fan back by itself, the helper notices on the next order, takes it over again and notes it in its log.
 - Giving back is thorough: it writes F<n>Md = 0 for every fan (and Ftst = 0 if it was used), keeps looking for 1 more second, and gives back again any fan that turned up as held late.
 - Icons: all drawn as shapes in the app (no emoji, no stock icons). App icon: a flat calm blue tile with a white hand-drawn three-blade fan.
+
+## 0.7: notices, fan check-up, dots, right-click menu
+
+### The app working hardest (0.7)
+- The heat notice reads "The chip has been at 90° or more for 5 minutes. Working hardest: Xcode." (`BusiestApp.words`). The "Too hot (101°). The Mac has the fans again." notice and its What happened line ("Too hot (101°): the Mac has the fans again. Working hardest: Xcode") name it too; the heat notice line in What happened ends the same way.
+- Source: `ps -Ao pcpu=,comm=` (share of one core, then the program's path), read at the moment of the notice (`AppModel.busiestNow`). An app's name is the first "….app" in the path, otherwise the last part of the path; so Chrome's helpers inside "Google Chrome.app" count with Chrome (shares are summed per app, `BusiestApp.appName`, `BusiestApp.busiest`).
+- Never named: `kernel_task` (the Mac's own cooling work), "AMS Fan Menu", `ps`, `launchd` (`BusiestApp.skipped`). Below 20 % of one core (`BusiestApp.atLeast` = 20.0) nothing is named and the text is as in 0.6. A tie goes to the name that comes first in the alphabet.
+- Before 0.7 the notices named no app.
+
+### Fan check-up (0.7)
+- Settings, section "Fan check-up" (blue heading), button "Check the fans" (id `checkFansButton`; while it runs it reads "Checking the fans…" with a small spinner and is disabled). Each fan is asked for its own top for 10 seconds (`FanCheck.seconds`); the ask is repeated every 3 seconds (`DeadMan.repeatEvery`) so the helper does not give the fans back. The highest speed of each fan in that time is noted; the app reads once a second while it runs.
+- A fan that reaches 90 % of its top (`FanCheck.fineShare`) is fine (`FanCheck.fine`). Result line, for example "18:52: Both fans fine · Left 5,310 of 5,348 · Right 5,750 of 5,776" (id `checkFansResult`); the same words, "Fan check-up: …", go to What happened and the diary. If a fan falls short: "Left fan fell short · Left 3,900 of 5,348 · Right 5,750 of 5,776"; both: "Both fans fell short"; with one fan: "The fan is fine" / "The fan fell short"; with no fan: "No fans to check" (`FanCheck.words`).
+- Afterwards the fans do what they did before: in Automatic the helper is asked to give them back (`giveBack`); with a choice the app runs (yours, or any other) the choice is sent again and carries on, and the Quiet rest and fall-short clocks start afresh.
+- Stops early (result line "The check-up stopped early: …", fans handed back as above): a new choice (`choose`), sleep, quitting (the helper is asked to give the fans back and the app waits for its word), or the helper refusing. Starting needs the helper to be ready; otherwise the helper note shows, as for a choice.
+- Hook: the distributed notification `com.schabbauer.AMSFanMenu.checkFans` starts the check-up in the running app.
+
+### A fan falling short (0.7)
+- Only while the app runs the fans (a choice other than Automatic is on) and not during a rest of "Quiet lets the fans stop". Rule `FanShort`: a fan is short when it turns below 80 % (`share`) of the speed asked for (the last speeds sent). If some fan stays short for 30 seconds (`patience`) the app sends a notification, for example "The Right fan turned at 2,100 though 3,600 was asked, for 30 seconds. Dust or wear can do that; the fan check-up in Settings tells more.", writes the line "Right fan fell short: 2,100 of 3,600 asked" to What happened, and notes an amber dot in the Fan speed graph. At most one notice in 6 hours (`pause`).
+- A new ask (the speeds sent change) gives the fans their time afresh: the 30 seconds count from there. A fan without a reading, or asked for 0, is never short.
+
+### Amber dots in the graphs (0.7)
+- Every notice sent is kept as `NoticeMark(time, sensor, words)` in the history file (`noticeList`; missing in files kept before 0.7, so earlier notices have no dot). Heat notice and "Too hot" → Chip graph (`sensor` chip); battery heat notice → Battery graph; a fan falling short → Fan speed graph (`sensor` nil). Kept 6 hours like the readings (`trim`).
+- Drawn in the large window as a 7-point circle in the warning amber (`Palette.warn`) at the moment of the notice, on the line (the highest line at that time; at the top when there is no reading).
+- Pointing at a dot (within the usual reach of the pointer) shows the notice's words in that graph's heading in place of the clock time (id `notice-<sensor>`; the Fan speed heading shows them after the fan figures). Example: "· Heat notice: chip 90° or more for 5 min · Xcode".
+- Sign: "Amber dot in a graph - a notice was sent here; point at it to read it". Amber keeps its one meaning, a note. The swatch is the existing amber circle (`SignKind.amber`); no new sign kind.
+
+### Right-click menu (0.7)
+- A right click or control-click on the fan mark shows: "Automatic", "Cool for 10 min", a line, "Graphs…", "Settings…" (`StatusItemController.rightMenuTitles`; ids `fanMenuRightAutomatic`, `fanMenuRightCool`, `fanMenuRightGraphs`, `fanMenuRightSettings`). A tick stands beside Automatic while the Mac decides. An open panel is closed first. A left click opens the panel as before.
+- "Cool for 10 min" is Cool for 600 seconds, asked as from outside: the "For" pick stays as it was. "Automatic" is the same as the Automatic button.
+
+### For other apps (0.7)
+- AMS Deck Mate 0.22 has a second live key, "Fans 1,650" ("Fans off" when the fans are stopped), read from the `fans` figures of `now.json`; a press opens the graphs (`openGraph`). Fan Menu did not change for this: `now.json` is unchanged.
+
+### Tour
+- A tour of the app (the course) is in `Docs/intro`, published separately.
+
+### Check hooks (0.7)
+- `--busiest`: prints the app working hardest, or "nothing stands out", then quits.
+- `--right-menu-items`: prints the titles of the right-click menu, then quits.
+- Distributed notification `com.schabbauer.AMSFanMenu.checkFans`: starts the fan check-up in the running app.
+
+### Proven / not proven (0.7)
+- Proven: the rule tests (59), among them `BusiestApp` (helpers summed, kernel_task skipped, 20 % floor), `FanCheck` (90 % rule, words), `FanShort` (80 %, 30 seconds, 6 hours) and the notice marks in the history.
+- Seen on the real Mac: (to be filled)
+- Helper unchanged (version 2): no new password.
 
 ## What is proven and what is not yet
 
@@ -319,6 +367,9 @@ Not proven yet:
 - 0.5 (build 8, 25 Nov 2026): ten things from the owner's list. Graphs: the figure where you point (upright line, dot per line, heading shows the figure at that moment, "–" at gaps); a pale blue stretch in the Fan speed graph while a choice was on; a "Show" row picks which of six graphs show (Storage and Case hidden at first, setting `shownGraphs`); the window is 560 x 768. Learning: "was the choice worth it" lines in What happened (`Worth`, at least 120 s); "The last 7 days" block (`Week`/`DayTally`, `week.json`); a "Power" block ("Whole Mac 42 W", sensor PSTR); a second temperature line "Storage 41° · Case 31°" (TH0a/TH0b, Ts0P/Ts1P) with a graph each. Rules that act by themselves: battery heat notice (`BatteryNotice`, setting `batteryNotice`); heat notice level 80° to 95° (`HeatNotice.levels`, `heatLevel`, no amber line with the switch off); quiet hours (`QuietHours`, `quietHours`, `quietFrom`, `quietTo`). New hooks `--pretend-clock`, `--pretend-battery-temp`. History readings carry `storage`, `palm`, `power`. New signs: Teal, pale blue stretch, pointer line. The helper did not change (version 2), so no password is needed.
 
 - 0.6 (build 9, 25 Nov 2026): five things from the owner's second list. Charging shown in the Battery graph (`Sample.charging`, `History.chargingStretches`, pale teal stretch and the words "charging" / "charging now", sign `paleTealStretch`). A gap says why (`History.pauses`, `Pause`, `pauseList`; "asleep" / "not running"; pointing into a gap says "asleep at 14:20"). The small graph may show Chip, Battery or Case (setting `smallGraph`, section "Small graph", caption names it). A word when a timed choice ends (setting `timedWord`, off at first; `Worth.change`, `Worth.overWords`). The file `now.json` with the newest figures every 5 seconds for AMS Deck Mate 0.21 (key "Chip 56°"; a press opens the large graphs through `openGraph`). The helper did not change (version 2), so no password is needed.
+
+- 0.7 (build 10, 25 Nov 2026): the heat notice and the "Too hot" notice name the app working hardest (`BusiestApp`); a fan check-up in Settings (`FanCheck`, "Check the fans", 10 seconds, 90 %); a fan falling short brings a notice, a What happened line and a dot (`FanShort`, 80 %, 30 seconds, once in 6 hours); amber dots in the large graphs where a notice was sent (`NoticeMark`, `History.notice`, kept 6 hours, words on pointing); a right-click menu on the fan mark; check hooks `--busiest`, `--right-menu-items`, `checkFans`. AMS Deck Mate 0.22 shows "Fans 1,650" from the unchanged `now.json`. The helper did not change (version 2), so no password is needed. 59 rule tests.
+
 
 ## Icon files
 

@@ -19,6 +19,11 @@ It is a personal app, made for an Apple Silicon MacBook Pro (a 16-inch 2021, two
 - The small graph in the panel can show the chip, battery or case temperature (Settings, "Small graph") (0.6).
 - An optional notification when a timed choice ends, with the chip temperature before and after (0.6).
 - Writes its newest figures to a small file every 5 seconds, so AMS Deck Mate 0.21 can show "Chip 56°" on a key (0.6).
+- The heat notice names the app working hardest, for example "Working hardest: Xcode." (0.7).
+- Settings has a "Fan check-up": each fan runs to its top for 10 seconds and the result says whether it got there (0.7). A notification comes by itself when a fan stays well below the speed asked for (0.7).
+- Amber dots in the large graphs show where a notice was sent; point at one to read it (0.7).
+- A right click on the fan mark gives a short menu: Automatic, Cool for 10 min, Graphs, Settings (0.7).
+- AMS Deck Mate 0.22 can show "Fans 1,650" live on a second key (0.7).
 - A Settings window with four tabs (Settings, What happened, How it works, What's new): Open at login, your own Quiet and Cool speeds, a heat notice, Quiet during calls, the Mac decides on battery, choice back after sleep, and the helper.
 
 ## Build and install
@@ -38,3 +43,5 @@ swift test --package-path Core
 ```
 
 The full specification is in `Docs/SPEC.md`.
+
+A tour of the app (the course) is in `Docs/intro`.
