@@ -54,6 +54,32 @@ public extension QuietHours {
     }
 }
 
+// MARK: Readings that cannot be true
+
+public extension Reading {
+    /// The graphics sensors answer about 9° while that part of the chip sleeps (seen 25 Nov 2026, with the
+    /// chip at 50°). Inside a running Mac nothing on the chip is that cold, so below this it is no reading.
+    static let graphicsFloor = 15.0
+
+    /// The average of the values that can be true and are at least `floor`.
+    static func average(_ values: [Double], floor: Double) -> Double? {
+        average(values.filter { $0 >= floor })
+    }
+}
+
+public extension History {
+    /// The same readings without graphics figures that cannot be true (kept by 0.4, before the floor).
+    func withoutFalseGraphics() -> History {
+        var clean = self
+        clean.replaceSamples(samples.map { sample in
+            guard let graphics = sample.graphics, graphics < Reading.graphicsFloor else { return sample }
+            return Sample(time: sample.time, chip: sample.chip, speeds: sample.speeds, graphics: nil, battery: sample.battery,
+                          storage: sample.storage, palm: sample.palm, power: sample.power)
+        })
+        return clean
+    }
+}
+
 // MARK: The battery heat notice
 
 public enum BatteryNotice {

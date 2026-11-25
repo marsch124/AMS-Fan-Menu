@@ -91,6 +91,9 @@ public struct History: Codable, Equatable, Sendable {
         return true
     }
 
+    /// For tidying kept readings: the same moments, corrected.
+    mutating func replaceSamples(_ new: [Sample]) { samples = new }
+
     public mutating func mark(_ title: String, at time: Double) {
         marks.append(ChoiceMark(time: time, title: title))
         trim(now: time)

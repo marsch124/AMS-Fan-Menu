@@ -188,7 +188,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if model.heatNotice { model.askForNotes() }
     }
 
-    @objc private func showSettings() { openSettings() }
+    /// A word with the wish picks the tab ("happened", "guide", "news") or the end of the Settings page ("end"), for checks.
+    @objc private func showSettings(_ notification: Notification) {
+        let word = notification.object as? String ?? ""
+        openSettings(tab: SettingsView.Tab(rawValue: word) ?? .settings, atEnd: word == "end")
+    }
     @objc private func showGraph() { openGraph() }
     @objc private func pretendWake() { model?.pretendSleepAndWake() }
     @objc private func pretendClock(_ notification: Notification) { model?.pretend(clock: notification.object as? String ?? "real") }
@@ -227,12 +231,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         graphWindow?.orderFrontRegardless()
     }
 
-    private func openSettings() {
+    private func openSettings(tab: SettingsView.Tab = .settings, atEnd: Bool = false) {
         guard let model else { return }
         model.checkHelper()
         let content = NSHostingController(rootView: SettingsView(model: model, close: { [weak self] in
             self?.settingsWindow?.close()
-        }))
+        }, startTab: tab, atEnd: atEnd))
         if let settingsWindow {
             settingsWindow.contentViewController = content
         } else {

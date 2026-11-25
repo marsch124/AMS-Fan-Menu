@@ -269,7 +269,9 @@ Not proven yet:
 - Open at login across a real restart.
 - The too-hot hand-back.
 - The rough lines (0.4.1) are hearsay from forum posts and have not been checked against this Mac.
-- 0.5: see the release notes of the build.
+- 0.5, proven on his Mac on 25 Nov 2026: `--read` gives storage, case and power (32°, 30°, 26 W); a two-minute Cool (`--choose cool:125`) ended by itself and "What happened" got "Cool for 2 min: chip 66° down to 46°" just before "The time was up: the Mac has the fans again"; quiet hours with `--pretend-clock 23:00` switched to Quiet (state file `reason` "quiet hours", status line "You decide: Quiet (quiet hours)") and with `--pretend-clock 12:00` back to Automatic, with both lines in "What happened"; the real Settings window (both ends, and the "What happened" tab with "The last 7 days"), the real panel and the real graph window were photographed by day.
+- 0.5, found by those pictures and fixed before release: the week's figures were lost when the app quit (now saved on quit too); the graphics sensors answer about 9° while that part of the chip sleeps (now no reading below 15°: the panel keeps the last true figure, the graph has a gap, and kept readings are tidied when the app starts).
+- 0.5, not proven: the battery heat notice for real (needs 10 minutes above 35°; rule test only); the figure where you point with a real pointer (seen only in pictures drawn with a fixed moment); quiet hours over a real night, with sleep, a call or the cable pulled in between (rule tests and the pretend clock only); the real windows by night (pictures with sample data only); the week block after more than one day.
 - The green line "Fans at full in Automatic" has never been seen for real: the Mac has not taken the fans to full since 0.4. Only its rule test has run.
 
 ## Version history

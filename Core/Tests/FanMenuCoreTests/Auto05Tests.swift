@@ -45,6 +45,19 @@ final class Auto05Tests: XCTestCase {
         XCTAssertEqual(QuietHours.minute(of: 1_795_000_000, timeZone: TimeZone(identifier: "UTC")!), 11 * 60 + 6)
     }
 
+    /// 0.5: a graphics reading of about 9° (that part asleep) is no reading, also in what was kept before.
+    func testAGraphicsReadingThatCannotBeTrueIsNoReading() {
+        XCTAssertNil(Reading.average([9.2, 9.2, 0, 0], floor: Reading.graphicsFloor))
+        XCTAssertEqual(Reading.average([9.2, 54, 52], floor: Reading.graphicsFloor), 53)
+        var history = History()
+        history.add(Sample(time: 0, chip: 50, speeds: [0], graphics: 9.2, battery: 30))
+        history.add(Sample(time: 5, chip: 51, speeds: [0], graphics: 52, battery: 30))
+        let clean = history.withoutFalseGraphics()
+        XCTAssertNil(clean.samples[0].graphics)
+        XCTAssertEqual(clean.samples[0].battery, 30)
+        XCTAssertEqual(clean.samples[1].graphics, 52)
+    }
+
     /// 0.5: what a choice did to the chip, said when it ends.
     func testWasTheChoiceWorthIt() {
         XCTAssertEqual(Worth.words(title: "Cool", seconds: 600, from: 78.2, to: 61.4), "Cool for 10 min: chip 78° down to 61°")

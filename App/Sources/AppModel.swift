@@ -178,6 +178,8 @@ final class AppModel: ObservableObject {
     private var hoursSpent = false
     /// For checks: pretend it is this time of day (minutes since midnight).
     private var pretendMinute: Int?
+    /// The graphics temperature as just read; nil while that part sleeps (the graph then has a gap).
+    private var graphicsReading: Double?
     /// For checks: pretend the battery has this temperature (for the battery heat notice only).
     private var pretendBatteryTemp: Double?
     /// Was the choice worth it: the chip when the choice in use began.
@@ -256,7 +258,7 @@ final class AppModel: ObservableObject {
         }
         if let data = try? Data(contentsOf: Self.historyFile), var old = try? JSONDecoder().decode(History.self, from: data) {
             old.trim(now: wall)
-            history = old
+            history = old.withoutFalseGraphics()
         }
         if let data = try? Data(contentsOf: Self.weekFile), let old = try? JSONDecoder().decode(Week.self, from: data) {
             week = old
@@ -291,11 +293,13 @@ final class AppModel: ObservableObject {
             chipReadings.append(chipNow)
             if chipReadings.count > Follow.smoothOver { chipReadings.removeFirst(chipReadings.count - Follow.smoothOver) }
         }
-        let graphicsNow = Reading.average(SensorKeys.graphics.compactMap { smc.number($0) })
+        // Asleep, the graphics part answers about 9°: no reading. The panel keeps the last true figure.
+        let graphicsNow = Reading.average(SensorKeys.graphics.compactMap { smc.number($0) }, floor: Reading.graphicsFloor)
+        graphicsReading = graphicsNow
         let batteryNow = Reading.average(SensorKeys.battery.compactMap { smc.number($0) })
         // Whole degrees are what the panel shows; anything finer would only redraw it for nothing.
         if chipNow?.rounded() != chip?.rounded() { chip = chipNow }
-        if graphicsNow?.rounded() != graphics?.rounded() { graphics = graphicsNow }
+        if let graphicsNow, graphicsNow.rounded() != graphics?.rounded() { graphics = graphicsNow }
         if batteryNow?.rounded() != battery?.rounded() { battery = batteryNow }
         let storageNow = Reading.average(MoreKeys.storage.compactMap { smc.number($0) })
         let palmNow = Reading.average(MoreKeys.palm.compactMap { smc.number($0) })
@@ -342,7 +346,7 @@ final class AppModel: ObservableObject {
     private func addSample() {
         let time = wall
         guard history.add(Sample(time: time, chip: chip, speeds: fans.compactMap(\.speed),
-                                 graphics: graphics, battery: battery, storage: storage, palm: palm, power: power)) else { return }
+                                 graphics: graphicsReading, battery: battery, storage: storage, palm: palm, power: power)) else { return }
         historyNow = time
         learnFull()
         week.add(time: time, chip: chip, fansTurning: fans.contains { ($0.speed ?? 0) > 0 },
@@ -363,12 +367,15 @@ final class AppModel: ObservableObject {
         Diary.note("The Mac itself took the fans to full with the chip at \(Words.degrees(seen))")
     }
 
+    private func saveWeek() {
+        guard let data = try? JSONEncoder().encode(week) else { return }
+        try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
+        try? data.write(to: Self.weekFile, options: .atomic)
+    }
+
     private func saveHistory() {
         lastHistorySave = now
-        if let data = try? JSONEncoder().encode(week) {
-            try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
-            try? data.write(to: Self.weekFile, options: .atomic)
-        }
+        saveWeek()
         let copy = history
         let file = Self.historyFile
         DispatchQueue.global(qos: .utility).async {
@@ -574,6 +581,7 @@ final class AppModel: ObservableObject {
             try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
             try? data.write(to: Self.historyFile, options: .atomic)
         }
+        saveWeek()
         Diary.finish()
     }
 

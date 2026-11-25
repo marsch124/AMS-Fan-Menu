@@ -46,6 +46,8 @@ struct SettingsView: View {
     var scrolls = true
     /// The tab shown first.
     var startTab: Tab = .settings
+    /// For checks: open with the page scrolled to its end.
+    var atEnd = false
     @State private var picked: Tab?
     @State private var openAtLogin = UserDefaults.standard.bool(forKey: LoginItem.wantedKey)
     @Environment(\.colorScheme) private var scheme
@@ -63,7 +65,16 @@ struct SettingsView: View {
 
             Group {
                 if scrolls {
-                    ScrollView { page.padding(.trailing, 6) }
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            page.padding(.trailing, 6)
+                            Color.clear.frame(height: 1).id("pageEnd")
+                        }
+                        .onAppear {
+                            guard atEnd else { return }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo("pageEnd", anchor: .bottom) }
+                        }
+                    }
                 } else {
                     page.frame(maxHeight: .infinity, alignment: .top).clipped()
                 }
