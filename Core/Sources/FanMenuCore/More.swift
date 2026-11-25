@@ -52,6 +52,18 @@ public struct ChoiceMark: Codable, Equatable, Sendable {
 }
 
 /// 0.6: a stretch without readings, and why: the Mac was asleep, or the app was not running.
+/// 0.7: a notice that was sent, shown as an amber dot in the graph of its sensor.
+public struct NoticeMark: Codable, Equatable, Sendable {
+    public let time: Double
+    public let sensor: Sensor
+    public let words: String
+    public init(time: Double, sensor: Sensor, words: String) {
+        self.time = time
+        self.sensor = sensor
+        self.words = words
+    }
+}
+
 public struct Pause: Codable, Equatable, Sendable {
     public static let asleep = "asleep", notRunning = "not running"
     public let from: Double
@@ -98,6 +110,8 @@ public struct History: Codable, Equatable, Sendable {
     public private(set) var marks: [ChoiceMark] = []
     /// Missing in files kept before 0.6.
     private var pauseList: [Pause]?
+    /// 0.7: the notices sent, for the amber dots in the graphs. Missing in files kept before 0.7.
+    private var noticeList: [NoticeMark]?
 
     public init() {}
 
@@ -109,6 +123,20 @@ public struct History: Codable, Equatable, Sendable {
         guard to - from >= History.every * 3 else { return }
         pauseList = pauses + [Pause(from: from, to: to, why: why)]
         trim(now: to)
+    }
+
+    /// 0.7: the notices sent (heat, too hot, battery, a fan falling short).
+    public var notices: [NoticeMark] { noticeList ?? [] }
+
+    /// Notes a notice that was sent, so the graphs can show an amber dot at its moment.
+    public mutating func notice(_ words: String, sensor: Sensor, at time: Double) {
+        noticeList = notices + [NoticeMark(time: time, sensor: sensor, words: words)]
+        trim(now: time)
+    }
+
+    /// The notices of one graph in the last `seconds`.
+    public func notices(_ sensor: Sensor, last seconds: Double, now: Double) -> [NoticeMark] {
+        notices.filter { $0.sensor == sensor && $0.time >= now - seconds && $0.time <= now }
     }
 
     /// The pauses that touch the last `seconds`.
@@ -144,6 +172,7 @@ public struct History: Codable, Equatable, Sendable {
         if let first = samples.first, first.time < oldest { samples.removeAll { $0.time < oldest } }
         if let first = marks.first, first.time < oldest { marks.removeAll { $0.time < oldest } }
         if let first = pauseList?.first, first.to < oldest { pauseList?.removeAll { $0.to < oldest } }
+        if let first = noticeList?.first, first.time < oldest { noticeList?.removeAll { $0.time < oldest } }
     }
 
     public func samples(last seconds: Double, now: Double) -> [Sample] {
@@ -212,7 +241,7 @@ public enum Plot {
 // MARK: The three temperatures and their level lines (0.4)
 
 /// One of the temperatures the Mac reports (0.4: chip, graphics, battery; 0.5: storage and the case under the hands).
-public enum Sensor: String, CaseIterable, Sendable {
+public enum Sensor: String, CaseIterable, Codable, Sendable {
     case chip, graphics, battery, storage, palm
 
     public var title: String {
