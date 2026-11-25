@@ -8,11 +8,28 @@ public enum BusiestApp {
     /// Not an app: the Mac's own work (kernel_task is how the Mac slows itself when hot), and this app itself.
     public static let skipped: Set<String> = ["kernel_task", "AMS Fan Menu", "ps", "launchd"]
 
-    /// The app's name for one program path: the first "….app" in the path, otherwise the last part.
+    /// Plain names for the Mac's own busy workers.
+    public static let plain: [String: String] = [
+        "mds": "Spotlight", "mds_stores": "Spotlight", "mdworker": "Spotlight", "mdworker_shared": "Spotlight", "mdsync": "Spotlight",
+        "backupd": "Time Machine", "backupd-helper": "Time Machine",
+        "photoanalysisd": "Photos", "photolibraryd": "Photos", "mediaanalysisd": "Photos",
+        "bird": "iCloud Drive", "cloudd": "iCloud", "fileproviderd": "iCloud Drive",
+        "softwareupdated": "Software Update", "WindowServer": "the screen", "XprotectService": "the Mac's virus check",
+        "PerfPowerServices": "the Mac's battery records", "suggestd": "Siri suggestions", "corespotlightd": "Spotlight",
+    ]
+
+    /// The app's name for one program path: the first "….app" in the path, otherwise the last part —
+    /// in plain words where the Mac's own worker has a plain name; "com.maker.Name" becomes "Name".
     public static func appName(path: String) -> String {
         let parts = path.split(separator: "/").map(String.init)
         if let app = parts.first(where: { $0.hasSuffix(".app") }) { return String(app.dropLast(4)) }
-        return parts.last ?? path
+        let last = parts.last ?? path
+        if let name = plain[last] { return name }
+        let dots = last.split(separator: ".")
+        if dots.count >= 3, ["com", "org", "net", "io", "de", "se"].contains(dots[0]) {
+            return dots.dropFirst(2).joined(separator: " ")
+        }
+        return last
     }
 
     /// The name and summed share of the busiest app, or nil when nothing works hard.

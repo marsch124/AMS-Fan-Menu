@@ -14,6 +14,9 @@ final class Notices07Tests: XCTestCase {
         XCTAssertEqual(BusiestApp.busiest(psOutput: ps)?.name, "Xcode")
         XCTAssertEqual(BusiestApp.busiest(psOutput: ps)?.share, 120)
         XCTAssertEqual(BusiestApp.appName(path: "/usr/libexec/trustd"), "trustd")
+        XCTAssertEqual(BusiestApp.appName(path: "/System/Library/Frameworks/CoreServices.framework/Support/mds_stores"), "Spotlight")
+        XCTAssertEqual(BusiestApp.appName(path: "/Library/PrivilegedHelperTools/com.macpaw.CleanMyMac-setapp.HealthMonitor"), "CleanMyMac-setapp HealthMonitor")
+        XCTAssertEqual(BusiestApp.busiest(psOutput: " 15.0 /x/mds\n 15.0 /x/mds_stores\n 25.0 /x/trustd")?.name, "Spotlight", "its workers count together")
         XCTAssertNil(BusiestApp.busiest(psOutput: "  5.0 /usr/libexec/trustd\n  300.0 kernel_task"), "nothing stands out")
         XCTAssertEqual(BusiestApp.words("Xcode"), "Working hardest: Xcode.")
     }
