@@ -55,6 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
         // For checks: prints the fans and temperatures as the Mac reports them, then quits. Changes nothing.
+        // 0.7: the app working hardest right now, as the heat notice would name it.
+        if arguments.contains("--busiest") {
+            print(AppModel.busiestNow() ?? "nothing stands out")
+            NSApp.terminate(nil)
+            return
+        }
         if arguments.contains("--read") {
             print(AppModel(readOnly: true).readout())
             Diary.finish()
@@ -178,6 +184,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         center.addObserver(self, selector: #selector(showSettings),
                            name: Notification.Name("com.schabbauer.AMSFanMenu.openSettings"), object: nil)
         center.addObserver(self, selector: #selector(chooseFromOutside(_:)), name: Self.chooseName, object: nil)
+        // 0.7: lets a check from outside start the fan check-up in the running app.
+        center.addObserver(self, selector: #selector(checkFans),
+                           name: Notification.Name("com.schabbauer.AMSFanMenu.checkFans"), object: nil)
         center.addObserver(self, selector: #selector(showGraph),
                            name: Notification.Name("com.schabbauer.AMSFanMenu.openGraph"), object: nil)
         center.addObserver(self, selector: #selector(pretendWake), name: Self.pretendWakeName, object: nil)
@@ -200,6 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         openSettings(tab: SettingsView.Tab(rawValue: word) ?? .settings, atEnd: word == "end")
     }
     @objc private func showGraph() { openGraph() }
+    @objc private func checkFans() { model?.startCheckUp() }
     @objc private func pretendWake() { model?.pretendSleepAndWake() }
     @objc private func pretendClock(_ notification: Notification) { model?.pretend(clock: notification.object as? String ?? "real") }
     @objc private func pretendBatteryTemp(_ notification: Notification) {
