@@ -58,6 +58,35 @@ final class Auto05Tests: XCTestCase {
         XCTAssertEqual(clean.samples[1].graphics, 52)
     }
 
+    /// 0.6: a stretch without readings carries its reason, and old files without any still open.
+    func testAPauseSaysWhyThereAreNoReadings() throws {
+        var history = History()
+        history.add(Sample(time: 0, chip: 50, speeds: [0], charging: true))
+        history.pause(from: 5, to: 12, why: Pause.asleep)
+        XCTAssertTrue(history.pauses.isEmpty, "shorter than three readings: not worth a word")
+        history.pause(from: 100, to: 1900, why: Pause.asleep)
+        XCTAssertEqual(history.pause(at: 500)?.why, "asleep")
+        XCTAssertNil(history.pause(at: 2000))
+        XCTAssertEqual(history.pauses(last: 600, now: 2400).count, 1, "it ends inside the last ten minutes")
+        XCTAssertTrue(history.pauses(last: 600, now: 9000).isEmpty)
+        let back = try JSONDecoder().decode(History.self, from: JSONEncoder().encode(history))
+        XCTAssertEqual(back.pauses, history.pauses)
+        XCTAssertEqual(back.samples.first?.charging, true)
+        let old = try JSONDecoder().decode(History.self, from: Data(#"{"samples":[{"time":5,"chip":70,"speeds":[1500]}],"marks":[]}"#.utf8))
+        XCTAssertTrue(old.pauses.isEmpty)
+        XCTAssertNil(old.samples.first?.charging)
+        history.add(Sample(time: 1900 + History.keep + 10, chip: 50, speeds: [0]))
+        XCTAssertTrue(history.pauses.isEmpty, "a pause older than six hours is dropped")
+    }
+
+    /// 0.6: the word when a timed choice ends.
+    func testTheWordWhenATimedChoiceEnds() {
+        XCTAssertEqual(Worth.overWords(title: "Cool", change: Worth.change(seconds: 600, from: 78, to: 61)),
+                       "Cool is over: chip 78° down to 61°. The Mac has the fans again.")
+        XCTAssertEqual(Worth.overWords(title: "Full", change: Worth.change(seconds: 60, from: 78, to: 61)),
+                       "Full is over. The Mac has the fans again.")
+    }
+
     /// 0.5: what a choice did to the chip, said when it ends.
     func testWasTheChoiceWorthIt() {
         XCTAssertEqual(Worth.words(title: "Cool", seconds: 600, from: 78.2, to: 61.4), "Cool for 10 min: chip 78° down to 61°")

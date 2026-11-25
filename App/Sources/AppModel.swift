@@ -35,6 +35,18 @@ enum Power {
         let info = IOPSCopyPowerSourcesInfo().takeRetainedValue()
         return (IOPSGetProvidingPowerSourceType(info).takeUnretainedValue() as String) == kIOPSBatteryPowerValue
     }
+
+    /// Is the battery charging right now? nil when the Mac does not say (no battery).
+    static var charging: Bool? {
+        let info = IOPSCopyPowerSourcesInfo().takeRetainedValue()
+        let list = IOPSCopyPowerSourcesList(info).takeRetainedValue() as [CFTypeRef]
+        for source in list {
+            guard let about = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any],
+                  let charging = about[kIOPSIsChargingKey] as? Bool else { continue }
+            return charging
+        }
+        return nil
+    }
 }
 
 /// What the app knows and does: the readings, the choice in use, the rules that act by themselves,
@@ -106,6 +118,11 @@ final class AppModel: ObservableObject {
     @Published private(set) var quietTo: Int
     /// The last days in figures.
     @Published private(set) var week = Week()
+    // 0.6
+    /// Which temperature the small graph in the panel shows: chip, battery or the case.
+    @Published private(set) var smallGraph: Sensor
+    /// A notification when a timed choice ends.
+    @Published private(set) var timedWord: Bool
 
     /// Only an open panel needs fresh readings every second.
     var panelOpen = false {
@@ -197,6 +214,7 @@ final class AppModel: ObservableObject {
         static let fullSeenAt = "fullSeenAt"
         static let heatLevel = "heatLevel", batteryNotice = "batteryNotice"
         static let quietHours = "quietHours", quietFrom = "quietFrom", quietTo = "quietTo"
+        static let smallGraph = "smallGraph", timedWord = "timedWord"
     }
     static let heatCategory = "heat"
     static let switchToCoolAction = "switchToCool"
@@ -248,6 +266,8 @@ final class AppModel: ObservableObject {
         quietHours = store.object(forKey: Key.quietHours) as? Bool ?? false
         quietFrom = QuietHours.clean(store.object(forKey: Key.quietFrom) as? Int ?? QuietHours.defaultFrom)
         quietTo = QuietHours.clean(store.object(forKey: Key.quietTo) as? Int ?? QuietHours.defaultTo)
+        smallGraph = Self.smallGraphPicks.first { $0.rawValue == store.string(forKey: Key.smallGraph) } ?? .chip
+        timedWord = store.object(forKey: Key.timedWord) as? Bool ?? false
         smc = live || readOnly ? SMC() : nil
         guard self.live else {
             if readOnly { read() }
@@ -346,7 +366,8 @@ final class AppModel: ObservableObject {
     private func addSample() {
         let time = wall
         guard history.add(Sample(time: time, chip: chip, speeds: fans.compactMap(\.speed),
-                                 graphics: graphicsReading, battery: battery, storage: storage, palm: palm, power: power)) else { return }
+                                 graphics: graphicsReading, battery: battery, storage: storage, palm: palm, power: power,
+                                 charging: Power.charging)) else { return }
         historyNow = time
         learnFull()
         week.add(time: time, chip: chip, fansTurning: fans.contains { ($0.speed ?? 0) > 0 },
@@ -678,6 +699,21 @@ final class AppModel: ObservableObject {
         heatLevel = clean
         UserDefaults.standard.set(clean, forKey: Key.heatLevel)
         warmSince = nil
+    }
+
+    /// What the small graph in the panel may show.
+    static let smallGraphPicks: [Sensor] = [.chip, .battery, .palm]
+
+    func setSmallGraph(_ sensor: Sensor) {
+        guard Self.smallGraphPicks.contains(sensor) else { return }
+        smallGraph = sensor
+        UserDefaults.standard.set(sensor.rawValue, forKey: Key.smallGraph)
+    }
+
+    func setTimedWord(_ on: Bool) {
+        timedWord = on
+        UserDefaults.standard.set(on, forKey: Key.timedWord)
+        if on { askForNotes() }
     }
 
     func setBatteryNotice(_ on: Bool) {
@@ -1119,6 +1155,8 @@ final class AppModel: ObservableObject {
         model.quietFrom = QuietHours.defaultFrom
         model.quietTo = QuietHours.defaultTo
         model.week = Week.sample(now: 1_795_000_000)
+        model.smallGraph = .chip
+        model.timedWord = false
         model.myPercent = 45
         model.followStart = 65
         model.followFull = 95

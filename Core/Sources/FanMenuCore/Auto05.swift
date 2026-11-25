@@ -119,11 +119,22 @@ public enum Worth {
     public static let atLeast = 2 * 60.0
 
     public static func words(title: String, seconds: Double, from: Double?, to: Double?) -> String? {
+        guard let change = change(seconds: seconds, from: from, to: to) else { return nil }
+        return "\(title) for \(howLong(seconds)): \(change)"
+    }
+
+    /// "chip 78° down to 61°", "chip 60° up to 71°", "chip stayed at 70°"; nil when the choice was too short
+    /// or a reading is missing.
+    public static func change(seconds: Double, from: Double?, to: Double?) -> String? {
         guard seconds >= atLeast, let from, let to, from.isFinite, to.isFinite else { return nil }
         let before = Int(from.rounded()), after = Int(to.rounded())
-        let change = after < before ? "chip \(before)\u{00B0} down to \(after)\u{00B0}"
+        return after < before ? "chip \(before)\u{00B0} down to \(after)\u{00B0}"
             : after > before ? "chip \(before)\u{00B0} up to \(after)\u{00B0}" : "chip stayed at \(before)\u{00B0}"
-        return "\(title) for \(howLong(seconds)): \(change)"
+    }
+
+    /// 0.6: the notification when a timed choice ends: "Cool is over: chip 78° down to 61°. The Mac has the fans again."
+    public static func overWords(title: String, change: String?) -> String {
+        "\(title) is over" + (change.map { ": \($0)" } ?? "") + ". The Mac has the fans again."
     }
 
     /// "10 min", "1 h 5 min", "2 h"

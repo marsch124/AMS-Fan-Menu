@@ -22,9 +22,12 @@ public struct Sample: Codable, Equatable, Sendable {
     public let storage: Double?
     public let palm: Double?
     public let power: Double?
+    /// 0.6: the battery was charging; nil when the Mac did not say, and in every reading kept before 0.6.
+    public let charging: Bool?
 
     public init(time: Double, chip: Double?, speeds: [Double], graphics: Double? = nil, battery: Double? = nil,
-                storage: Double? = nil, palm: Double? = nil, power: Double? = nil) {
+                storage: Double? = nil, palm: Double? = nil, power: Double? = nil, charging: Bool? = nil) {
+        self.charging = charging
         self.time = time
         self.chip = chip
         self.speeds = speeds
@@ -45,6 +48,21 @@ public struct ChoiceMark: Codable, Equatable, Sendable {
     public init(time: Double, title: String) {
         self.time = time
         self.title = title
+    }
+}
+
+/// 0.6: a stretch without readings, and why: the Mac was asleep, or the app was not running.
+public struct Pause: Codable, Equatable, Sendable {
+    public static let asleep = "asleep", notRunning = "not running"
+    public let from: Double
+    public let to: Double
+    /// The words drawn in the gap: "asleep" or "not running".
+    public let why: String
+
+    public init(from: Double, to: Double, why: String) {
+        self.from = from
+        self.to = to
+        self.why = why
     }
 }
 
@@ -78,8 +96,30 @@ public struct History: Codable, Equatable, Sendable {
 
     public private(set) var samples: [Sample] = []
     public private(set) var marks: [ChoiceMark] = []
+    /// Missing in files kept before 0.6.
+    private var pauseList: [Pause]?
 
     public init() {}
+
+    /// 0.6: the stretches without readings whose reason is known.
+    public var pauses: [Pause] { pauseList ?? [] }
+
+    /// Notes why there are no readings for a while. Anything shorter than three readings is not worth a word.
+    public mutating func pause(from: Double, to: Double, why: String) {
+        guard to - from >= History.every * 3 else { return }
+        pauseList = pauses + [Pause(from: from, to: to, why: why)]
+        trim(now: to)
+    }
+
+    /// The pauses that touch the last `seconds`.
+    public func pauses(last seconds: Double, now: Double) -> [Pause] {
+        pauses.filter { $0.to >= now - seconds && $0.from <= now }
+    }
+
+    /// The pause a moment lies in, if any.
+    public func pause(at time: Double) -> Pause? {
+        pauses.first { time >= $0.from && time <= $0.to }
+    }
 
     /// Adds a reading unless the last one is younger than five seconds; drops what is older than six hours.
     /// Returns whether it was added.
@@ -103,6 +143,7 @@ public struct History: Codable, Equatable, Sendable {
         let oldest = now - History.keep
         if let first = samples.first, first.time < oldest { samples.removeAll { $0.time < oldest } }
         if let first = marks.first, first.time < oldest { marks.removeAll { $0.time < oldest } }
+        if let first = pauseList?.first, first.to < oldest { pauseList?.removeAll { $0.to < oldest } }
     }
 
     public func samples(last seconds: Double, now: Double) -> [Sample] {

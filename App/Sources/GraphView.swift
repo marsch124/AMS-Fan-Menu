@@ -219,6 +219,8 @@ struct SmallGraph: View {
     let history: History
     let now: Double
     let top: Double
+    /// 0.6: which temperature the coral line shows (chip, battery or the case).
+    var sensor: Sensor = .chip
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {

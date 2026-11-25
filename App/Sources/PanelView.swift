@@ -188,7 +188,7 @@ struct PanelView: View {
     /// The small graph of the last 15 minutes; a tap opens the large one.
     private var graph: some View {
         Button(action: openGraph) {
-            SmallGraph(history: model.history, now: model.historyNow, top: model.topSpeed)
+            SmallGraph(history: model.history, now: model.historyNow, top: model.topSpeed, sensor: model.smallGraph)
         }
         .buttonStyle(PressStyle())
         .accessibilityLabel("Graph of temperature and fan speed, last 15 minutes. Opens the large graph.")
