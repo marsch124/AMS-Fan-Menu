@@ -226,6 +226,8 @@ struct LargeGraph: View {
     let top: Double
     /// The chip temperature at which the Mac itself was last seen to take the fans to full; nil = not seen yet.
     var fullSeenAt: Double?
+    /// The level of the heat notice; nil = the notice is switched off, so no amber line.
+    var heatNotice: Double? = HeatNotice.limit
     var close: () -> Void = {}
     var startSpan: GraphSpan = .hour
     @State private var span: GraphSpan?
@@ -335,7 +337,7 @@ struct LargeGraph: View {
                     PlotDrawing(samples: samples, marks: marks,
                                 lines: [PlotLine(color: Palette.heat(scheme), value: { sensor.value(in: $0) })],
                                 scale: scale, now: now, span: current.seconds, grid: true,
-                                levels: Levels.of(sensor, fullSeenAt: fullSeenAt), usual: usual)
+                                levels: Levels.of(sensor, fullSeenAt: fullSeenAt, heatNotice: heatNotice), usual: usual)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -390,7 +392,9 @@ extension History {
                 temp = 50 + 22 * k + wobble; speed = 2100 + wobble * 40
             }
             history.add(Sample(time: time, chip: temp, speeds: [speed, speed + 60],
-                               graphics: temp - 8 + cos(time / 53), battery: 29 + (time - start) / total * 4 + sin(time / 91) * 0.4))
+                               graphics: temp - 8 + cos(time / 53), battery: 29 + (time - start) / total * 4 + sin(time / 91) * 0.4,
+                               storage: 38 + (temp - 50) / 8 + sin(time / 140) * 0.5, palm: 30 + (temp - 50) / 12,
+                               power: 14 + (temp - 50) * 1.3 + sin(time / 23) * 3))
             time += History.every
         }
         history.mark("Cool", at: coolAt)

@@ -265,7 +265,8 @@ struct GraphWindow: View {
     var close: () -> Void = {}
 
     var body: some View {
-        LargeGraph(history: model.history, now: model.historyNow, top: model.topSpeed, fullSeenAt: model.fullSeenAt, close: close)
+        LargeGraph(history: model.history, now: model.historyNow, top: model.topSpeed, fullSeenAt: model.fullSeenAt,
+                   heatNotice: model.heatNotice ? model.heatLevel : nil, close: close)
     }
 }
 

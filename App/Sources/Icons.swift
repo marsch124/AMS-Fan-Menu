@@ -148,6 +148,10 @@ enum Palette {
     static func danger(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 1.0, green: 0.42, blue: 0.42) : Color(red: 0.78, green: 0.10, blue: 0.14)
     }
+    /// Teal: how much power the whole Mac uses. It stands for nothing else.
+    static func power(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.36, green: 0.80, blue: 0.80) : Color(red: 0.03, green: 0.44, blue: 0.47)
+    }
     /// Purple: the "What happened" list and its tab. It stands for nothing else.
     static func story(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 0.72, green: 0.64, blue: 0.96) : Color(red: 0.42, green: 0.30, blue: 0.74)

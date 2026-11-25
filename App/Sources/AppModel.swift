@@ -55,6 +55,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var chip: Double?
     @Published private(set) var graphics: Double?
     @Published private(set) var battery: Double?
+    // 0.5: more the Mac reports
+    @Published private(set) var storage: Double?
+    /// The case under the hands.
+    @Published private(set) var palm: Double?
+    /// What the whole Mac uses, in watts.
+    @Published private(set) var power: Double?
     @Published private(set) var myPercent: Double
     @Published private(set) var followStart: Double
     @Published private(set) var followFull: Double
@@ -90,6 +96,16 @@ final class AppModel: ObservableObject {
     // 0.4
     /// The chip temperature at which the Mac itself was last seen to take the fans to full; nil = not seen yet.
     @Published private(set) var fullSeenAt: Double?
+    // 0.5
+    /// The chip temperature from which the heat notice counts: 80, 85, 90 or 95.
+    @Published private(set) var heatLevel: Double
+    @Published private(set) var batteryNotice: Bool
+    @Published private(set) var quietHours: Bool
+    /// Quiet hours, in minutes since midnight.
+    @Published private(set) var quietFrom: Int
+    @Published private(set) var quietTo: Int
+    /// The last days in figures.
+    @Published private(set) var week = Week()
 
     /// Only an open panel needs fresh readings every second.
     var panelOpen = false {
@@ -159,6 +175,8 @@ final class AppModel: ObservableObject {
         static let quietRest = "quietRest"
         static let happened = "happened"
         static let fullSeenAt = "fullSeenAt"
+        static let heatLevel = "heatLevel", batteryNotice = "batteryNotice"
+        static let quietHours = "quietHours", quietFrom = "quietFrom", quietTo = "quietTo"
     }
     static let heatCategory = "heat"
     static let switchToCoolAction = "switchToCool"
@@ -205,6 +223,11 @@ final class AppModel: ObservableObject {
         backAfterSleep = store.object(forKey: Key.backAfterSleep) as? Bool ?? false
         quietRest = store.object(forKey: Key.quietRest) as? Bool ?? true
         fullSeenAt = store.object(forKey: Key.fullSeenAt) as? Double
+        heatLevel = HeatNotice.clean(store.object(forKey: Key.heatLevel) as? Double ?? HeatNotice.limit)
+        batteryNotice = store.object(forKey: Key.batteryNotice) as? Bool ?? true
+        quietHours = store.object(forKey: Key.quietHours) as? Bool ?? false
+        quietFrom = QuietHours.clean(store.object(forKey: Key.quietFrom) as? Int ?? QuietHours.defaultFrom)
+        quietTo = QuietHours.clean(store.object(forKey: Key.quietTo) as? Int ?? QuietHours.defaultTo)
         smc = live || readOnly ? SMC() : nil
         guard self.live else {
             if readOnly { read() }
@@ -253,12 +276,29 @@ final class AppModel: ObservableObject {
         if chipNow?.rounded() != chip?.rounded() { chip = chipNow }
         if graphicsNow?.rounded() != graphics?.rounded() { graphics = graphicsNow }
         if batteryNow?.rounded() != battery?.rounded() { battery = batteryNow }
+        let storageNow = Reading.average(MoreKeys.storage.compactMap { smc.number($0) })
+        let palmNow = Reading.average(MoreKeys.palm.compactMap { smc.number($0) })
+        let powerNow = smc.number(MoreKeys.power).flatMap { $0.isFinite && $0 >= 0 && $0 < 500 ? $0 : nil }
+        if storageNow?.rounded() != storage?.rounded() { storage = storageNow }
+        if palmNow?.rounded() != palm?.rounded() { palm = palmNow }
+        if powerNow?.rounded() != power?.rounded() { power = powerNow }
+    }
+
+    /// 0.5: what else this Mac reports. The names are the ones fan tools commonly use; Apple documents none of them.
+    enum MoreKeys {
+        /// The storage (flash) chips.
+        static let storage = ["TH0a", "TH0b"]
+        /// The case under the hands, left and right of the trackpad.
+        static let palm = ["Ts0P", "Ts1P"]
+        /// What the whole Mac uses, in watts.
+        static let power = "PSTR"
     }
 
     /// The readings in a few lines, for a check from outside.
     func readout() -> String {
         var lines = fans.map { "\($0.name): \(Words.turns($0.speed)) (lowest \(Words.turns($0.range.lowest)), top \(Words.turns($0.range.top)))" }
         lines.append("Chip \(Words.degrees(chip)) · hottest core \(Words.degrees(hottest)) · Graphics \(Words.degrees(graphics)) · Battery \(Words.degrees(battery))")
+        lines.append("Storage \(Words.degrees(storage)) \u{00B7} Case \(Words.degrees(palm)) \u{00B7} Power \(Words.watts(power))")
         lines.append("Helper in place: \(HelperInstaller.installed ? "yes" : "no") · on battery: \(Power.onBattery ? "yes" : "no") · microphone in use: \(Microphone.inUse ? "yes" : "no")")
         return lines.joined(separator: "\n")
     }
@@ -281,7 +321,7 @@ final class AppModel: ObservableObject {
     private func addSample() {
         let time = wall
         guard history.add(Sample(time: time, chip: chip, speeds: fans.compactMap(\.speed),
-                                 graphics: graphics, battery: battery)) else { return }
+                                 graphics: graphics, battery: battery, storage: storage, palm: palm, power: power)) else { return }
         historyNow = time
         learnFull()
         if now - lastHistorySave > 300 { saveHistory() }
@@ -580,6 +620,34 @@ final class AppModel: ObservableObject {
     func setBatteryRule(_ on: Bool) {
         batteryRule = on
         UserDefaults.standard.set(on, forKey: Key.batteryRule)
+    }
+
+    // MARK: 0.5 — your own heat notice level, the battery heat notice, quiet hours
+
+    func setHeatLevel(_ value: Double) {
+        let clean = HeatNotice.clean(value)
+        guard clean != heatLevel else { return }
+        heatLevel = clean
+        UserDefaults.standard.set(clean, forKey: Key.heatLevel)
+        warmSince = nil
+    }
+
+    func setBatteryNotice(_ on: Bool) {
+        batteryNotice = on
+        UserDefaults.standard.set(on, forKey: Key.batteryNotice)
+        if on { askForNotes() }
+    }
+
+    func setQuietHours(_ on: Bool) {
+        quietHours = on
+        UserDefaults.standard.set(on, forKey: Key.quietHours)
+    }
+
+    func setQuietTimes(from: Int? = nil, to: Int? = nil) {
+        quietFrom = QuietHours.clean(from ?? quietFrom)
+        quietTo = QuietHours.clean(to ?? quietTo)
+        UserDefaults.standard.set(quietFrom, forKey: Key.quietFrom)
+        UserDefaults.standard.set(quietTo, forKey: Key.quietTo)
     }
 
     func setBackAfterSleep(_ on: Bool) {
@@ -922,6 +990,15 @@ final class AppModel: ObservableObject {
         model.chip = resting ? 56 : 72
         model.graphics = 64
         model.battery = 36
+        model.storage = 41
+        model.palm = 31
+        model.power = 42
+        model.heatLevel = 90
+        model.batteryNotice = true
+        model.quietHours = false
+        model.quietFrom = QuietHours.defaultFrom
+        model.quietTo = QuietHours.defaultTo
+        model.week = Week.sample(now: 1_795_000_000)
         model.myPercent = 45
         model.followStart = 65
         model.followFull = 95

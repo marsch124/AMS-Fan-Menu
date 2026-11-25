@@ -17,13 +17,22 @@ public struct Sample: Codable, Equatable, Sendable {
     public let graphics: Double?
     /// The battery temperature in °C; nil when there was no reading, and in every reading kept before 0.4.
     public let battery: Double?
+    /// 0.5: the storage and the case under the hands in °C, and the whole Mac's power use in watts.
+    /// nil when there was no reading, and in every reading kept before 0.5.
+    public let storage: Double?
+    public let palm: Double?
+    public let power: Double?
 
-    public init(time: Double, chip: Double?, speeds: [Double], graphics: Double? = nil, battery: Double? = nil) {
+    public init(time: Double, chip: Double?, speeds: [Double], graphics: Double? = nil, battery: Double? = nil,
+                storage: Double? = nil, palm: Double? = nil, power: Double? = nil) {
         self.time = time
         self.chip = chip
         self.speeds = speeds
         self.graphics = graphics
         self.battery = battery
+        self.storage = storage
+        self.palm = palm
+        self.power = power
     }
 }
 
@@ -158,15 +167,17 @@ public enum Plot {
 
 // MARK: The three temperatures and their level lines (0.4)
 
-/// One of the three temperatures the Mac reports.
+/// One of the temperatures the Mac reports (0.4: chip, graphics, battery; 0.5: storage and the case under the hands).
 public enum Sensor: String, CaseIterable, Sendable {
-    case chip, graphics, battery
+    case chip, graphics, battery, storage, palm
 
     public var title: String {
         switch self {
         case .chip: return "Chip temperature"
         case .graphics: return "Graphics temperature"
         case .battery: return "Battery temperature"
+        case .storage: return "Storage temperature"
+        case .palm: return "Case temperature"
         }
     }
 
@@ -175,6 +186,8 @@ public enum Sensor: String, CaseIterable, Sendable {
         case .chip: return sample.chip
         case .graphics: return sample.graphics
         case .battery: return sample.battery
+        case .storage: return sample.storage
+        case .palm: return sample.palm
         }
     }
 
@@ -183,7 +196,8 @@ public enum Sensor: String, CaseIterable, Sendable {
         switch self {
         case .chip: return 120
         case .graphics: return 110
-        case .battery: return 50
+        case .battery, .palm: return 50
+        case .storage: return 80
         }
     }
 }
@@ -219,13 +233,15 @@ public enum Levels {
     /// Other owners report (forums, not Apple): the chip slows itself somewhere from 100° to 110°. Drawn in the middle.
     public static let reportChipSlows = 105.0
 
-    public static func of(_ sensor: Sensor, fullSeenAt: Double? = nil) -> [Level] {
+    /// `heatNotice`: the level of the heat notice (0.5: your own pick); nil = the notice is switched off, no amber line.
+    public static func of(_ sensor: Sensor, fullSeenAt: Double? = nil, heatNotice: Double? = HeatNotice.limit) -> [Level] {
         switch sensor {
         case .chip:
-            var out = [
-                Level(kind: .watch, degrees: HeatNotice.limit, words: "Heat notice \(Words.degrees(HeatNotice.limit))"),
-                Level(kind: .tooHot, degrees: HeatGuard.limit, words: "Too hot \(Words.degrees(HeatGuard.limit))"),
-            ]
+            var out: [Level] = []
+            if let heatNotice {
+                out.append(Level(kind: .watch, degrees: heatNotice, words: "Heat notice \(Words.degrees(heatNotice))"))
+            }
+            out.append(Level(kind: .tooHot, degrees: HeatGuard.limit, words: "Too hot \(Words.degrees(HeatGuard.limit))"))
             if let fullSeenAt, fullSeenAt.isFinite {
                 out.append(Level(kind: .macFull, degrees: fullSeenAt,
                                  words: "Fans at full in Automatic \u{00B7} seen at \(Words.degrees(fullSeenAt))"))
@@ -235,7 +251,7 @@ public enum Levels {
             out.append(Level(kind: .report, degrees: reportChipSlows,
                              words: "Reports: chip slows itself at about 100\u{00B0} to 110\u{00B0}"))
             return out
-        case .graphics:
+        case .graphics, .storage, .palm:
             return []
         case .battery:
             return [
