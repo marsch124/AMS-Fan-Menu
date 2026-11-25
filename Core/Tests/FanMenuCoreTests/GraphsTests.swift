@@ -106,4 +106,22 @@ final class Graphs06Tests: XCTestCase {
         XCTAssertEqual(Plot.tensScale([30, 30]), 30...40)
         XCTAssertEqual(Plot.tensScale([]), 20...50)
     }
+
+    func testNoticesAreKeptFilteredAndTrimmed() throws {
+        var h = History()
+        let now = 100_000.0
+        h.notice("Heat", sensor: .chip, at: now - 600)
+        h.notice("Warm", sensor: .battery, at: now - 300)
+        XCTAssertEqual(h.notices.count, 2)
+        XCTAssertEqual(h.notices(.chip, last: 3600, now: now).map(\.words), ["Heat"])
+        XCTAssertTrue(h.notices(.chip, last: 300, now: now).isEmpty)
+        h.notice("Late", sensor: .chip, at: now + History.keep)
+        XCTAssertFalse(h.notices.contains { $0.words == "Heat" })
+        // A history kept before 0.7 has no notices field.
+        let old = try JSONEncoder().encode(History())
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: old) as? [String: Any])
+        json.removeValue(forKey: "noticeList")
+        let back = try JSONDecoder().decode(History.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertTrue(back.notices.isEmpty)
+    }
 }

@@ -48,6 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        // For checks: prints the titles of the right-click menu, then quits.
+        if arguments.contains("--right-menu-items") {
+            print(StatusItemController.rightMenuTitles.joined(separator: "\n"))
+            NSApp.terminate(nil)
+            return
+        }
         // For checks: prints the fans and temperatures as the Mac reports them, then quits. Changes nothing.
         if arguments.contains("--read") {
             print(AppModel(readOnly: true).readout())
