@@ -45,3 +45,5 @@ swift test --package-path Core
 The full specification is in `Docs/SPEC.md`.
 
 A tour of the app (the course) is in `Docs/intro`.
+
+The tour ("the course"): https://claude.ai/artifact/FH8QwsJ4gmEbdHAjwTppRs — source in `Docs/intro/index.html`.

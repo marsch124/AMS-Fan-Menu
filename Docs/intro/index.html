@@ -1,0 +1,740 @@
+<meta charset="utf-8">
+<title>Fan Menu Tour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: chapter rail on the left, coach + a pretend Mac on the right. Reusable tour engine: LESSONS + a small simulator.
+   Based on the AMS Mic Check tour engine. Written for AMS Fan Menu 0.7. Update this tour in the release that changes a taught screen.
+   Every pretend-screen class starts with fm- so it can never clash with the engine's own classes. */
+:root {
+  --bg: #F3F6FA; --panel: #FFFFFF; --fg: #17212B; --muted: #5F6C7A; --line: #DCE3EB;
+  --accent: #1F69C2; --accent-soft: #E1ECF9; --good: #2F7D32; --good-soft: #E6F3E6; --warn: #A8431A;
+  --desk-a: #C9D6E2; --desk-b: #E4DCEB; --menubar: rgba(255,255,255,.8); --menubar-fg: #1B1B1D;
+  --win: #FFFFFF; --win-bar: #F1F1F3; --win-fg: #1B1B1D; --win-muted: #6F6F74; --card: rgba(0,0,0,.05); --shadow: 0 18px 40px rgba(23,33,43,.2);
+  --c-mac: #1C7347; --c-macf: #217E4F; --c-fan: #1F69C2; --c-fanf: #2673C7; --c-heat: #B8421C; --c-heatf: #C44D24;
+  --c-warn: #8F5900; --c-danger: #C71A24; --c-power: #07707A; --c-story: #6B4DBC; --c-storyf: #6B4DBC;
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Figtree", -apple-system, "Segoe UI", sans-serif;
+  --f-mac: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg:#12171D; --panel:#1B232C; --fg:#EDF2F7; --muted:#9FADBB; --line:#2E3946;
+  --accent:#80BAFA; --accent-soft:#1B2D44; --good:#8FD18F; --good-soft:#1D3320; --warn:#F2A47F;
+  --desk-a:#1C2733; --desk-b:#2E2A3A; --menubar: rgba(28,28,32,.8); --menubar-fg:#F2F2F4;
+  --win:#27272B; --win-bar:#323237; --win-fg:#F2F2F4; --win-muted:#A5A5AD; --card: rgba(255,255,255,.07); --shadow: 0 18px 40px rgba(0,0,0,.55);
+  --c-mac:#66C78F; --c-macf:#298554; --c-fan:#80BAFA; --c-fanf:#2B75CC; --c-heat:#F79470; --c-heatf:#C44D24;
+  --c-warn:#F5C25C; --c-danger:#FF6B6B; --c-power:#5CCCCC; --c-story:#B8A3F5; --c-storyf:#755CC7;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg:#12171D; --panel:#1B232C; --fg:#EDF2F7; --muted:#9FADBB; --line:#2E3946;
+  --accent:#80BAFA; --accent-soft:#1B2D44; --good:#8FD18F; --good-soft:#1D3320; --warn:#F2A47F;
+  --desk-a:#1C2733; --desk-b:#2E2A3A; --menubar: rgba(28,28,32,.8); --menubar-fg:#F2F2F4;
+  --win:#27272B; --win-bar:#323237; --win-fg:#F2F2F4; --win-muted:#A5A5AD; --card: rgba(255,255,255,.07); --shadow: 0 18px 40px rgba(0,0,0,.55);
+  --c-mac:#66C78F; --c-macf:#298554; --c-fan:#80BAFA; --c-fanf:#2B75CC; --c-heat:#F79470; --c-heatf:#C44D24;
+  --c-warn:#F5C25C; --c-danger:#FF6B6B; --c-power:#5CCCCC; --c-story:#B8A3F5; --c-storyf:#755CC7;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 230px minmax(0,1fr); gap: 22px; }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none }
+svg.g { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none }
+
+/* Rail */
+.rail { display: flex; flex-direction: column; gap: 4px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.brand h1 { font-family: var(--f-display); font-size: 19px; line-height: 1.1; margin: 0; text-wrap: balance }
+.brand small { color: var(--muted); font-size: 12px }
+.chap { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.chap:hover { background: var(--accent-soft) }
+.chap:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.chap .n { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap }
+.chap.cur { background: var(--accent-soft); color: var(--accent); font-weight: 600 }
+.chap.done .n { color: var(--good) }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 10px 2px 2px }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s }
+.railnote { color: var(--muted); font-size: 12px; margin: 4px 2px }
+
+/* Coach */
+.main { display: flex; flex-direction: column; gap: 14px; min-width: 0 }
+.coach { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 16px; align-items: center; }
+.coach .eyebrow { grid-column: 1 / -1; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; display: flex; gap: 8px; align-items: center }
+.coach .eyebrow .kind { color: var(--muted); font-weight: 500 }
+.coach h2 { font-family: var(--f-display); font-size: 23px; line-height: 1.2; margin: 0; text-wrap: balance }
+.coach p { margin: 4px 0 0; color: var(--fg); max-width: 66ch }
+.coach .btns { display: flex; gap: 8px; align-items: center }
+.btn { font: inherit; font-weight: 600; border-radius: 9px; padding: 8px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer }
+.btn.main-b { background: #2673C7; border-color: #2673C7; color: #fff }
+.btn.main-b:disabled { opacity: .45; cursor: default }
+.btn.ghost { border-color: transparent; color: var(--muted) }
+.answers { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px }
+.ans { font: inherit; padding: 8px 14px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer }
+.ans:hover { border-color: var(--accent) }
+.ans.right { border-color: var(--good); background: var(--good-soft); color: var(--good); font-weight: 600 }
+.ans.wrong { border-color: var(--warn); color: var(--warn); text-decoration: line-through }
+.feedback { grid-column: 1 / -1; font-weight: 600; color: var(--good); min-height: 1.4em; margin: 0 }
+.feedback.no { color: var(--warn) }
+
+/* Stage = pretend Mac */
+.stagebox { position: relative; width: 100%; aspect-ratio: 960 / 560; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); max-width: 100% }
+.stage { position: absolute; left: 0; top: 0; width: 960px; height: 560px; transform-origin: 0 0; font-family: var(--f-mac); font-size: 12.5px; color: var(--win-fg);
+  background: radial-gradient(120% 90% at 15% 10%, var(--desk-b), transparent 60%), linear-gradient(160deg, var(--desk-a), var(--desk-b)); }
+.stage button { font-family: inherit }
+.fm-sp { flex: 1 }
+.fm-mbar { position: absolute; inset: 0 0 auto; height: 26px; background: var(--menubar); backdrop-filter: blur(10px); display: flex; align-items: center; gap: 16px; padding: 0 12px; color: var(--menubar-fg); font-size: 13px; z-index: 30 }
+.fm-mbar b { font-weight: 700 }
+.fm-item { position: relative; height: 22px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border: 0; background: none; color: inherit; font: inherit; border-radius: 5px; cursor: pointer }
+.fm-item:hover, .fm-item.open { background: rgba(127,127,127,.24) }
+.fm-tip { display: none; position: absolute; right: 0; top: 26px; width: max-content; max-width: 250px; background: var(--win); color: var(--win-fg); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); padding: 4px 8px; font-size: 12px; line-height: 1.35; text-align: left; z-index: 40; pointer-events: none }
+.fm-item:hover .fm-tip { display: block }
+.fm-item.open .fm-tip { display: none }
+.fm-tile { display: inline-grid; place-items: center; flex: none; background: #2673C7; color: #fff }
+.fm-glyph { display: block; flex: none }
+
+/* The panel */
+.fm-panel { position: absolute; right: 8px; top: 30px; width: 300px; background: var(--win); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow); padding: 8px 11px; z-index: 25; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px }
+.fm-panel > * { flex: none }
+.fm-ph { display: flex; align-items: center; gap: 7px }
+.fm-ph b { font-size: 14px } .fm-ph span { color: var(--win-muted) }
+.fm-gear { border: 0; background: none; color: var(--win-muted); padding: 2px; border-radius: 5px; cursor: pointer; display: grid }
+.fm-note { border-radius: 9px; padding: 7px 8px; background: color-mix(in srgb, var(--c-warn) 14%, transparent); color: var(--c-warn); display: flex; flex-direction: column; gap: 5px }
+.fm-wb { font: inherit; font-weight: 500; border: 0; border-radius: 7px; height: 24px; padding: 0 12px; cursor: pointer; background: color-mix(in srgb, var(--c-fan) 14%, transparent); color: var(--c-fan) }
+.fm-wb.full { background: var(--c-fanf); color: #fff }
+.fm-rd { display: flex; flex-direction: column; gap: 5px }
+.fm-cap { font-size: 11px; font-weight: 600 }
+.fm-fig { font-variant-numeric: tabular-nums; line-height: 1.3 }
+.fm-fig span { color: var(--win-muted) } .fm-fig b { font-weight: 600 }
+.fm-status { font-weight: 600; font-size: 13px }
+.fm-chs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
+.fm-ch { border: 0; border-radius: 9px; padding: 3px 4px; display: flex; flex-direction: column; align-items: center; background: color-mix(in srgb, var(--w) 13%, transparent); color: var(--w); cursor: pointer; font-size: 12.5px; line-height: 1.2 }
+.fm-ch b { font-weight: 600 } .fm-ch small { font-size: 10px; opacity: .85 }
+.fm-ch.on { background: var(--f); color: #fff }
+.fm-ch.wide { grid-column: 1 / -1; width: 100% }
+.fm-for { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--win-muted) }
+.fm-pill { border: 0; border-radius: 6px; height: 20px; padding: 0 7px; font-size: 11px; font-weight: 500; white-space: nowrap; cursor: pointer; background: color-mix(in srgb, var(--c-fan) 14%, transparent); color: var(--c-fan) }
+.fm-pill.on { background: var(--c-fanf); color: #fff }
+.fm-sl { position: relative; height: 18px; flex: 1; cursor: pointer; --c: var(--c-fanf) }
+.fm-sl::before { content: ""; position: absolute; left: 8px; right: 8px; top: 7px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--c) 28%, transparent) }
+.fm-sl i { position: absolute; left: 6px; top: 7px; height: 4px; border-radius: 2px; background: var(--c) }
+.fm-sl b { position: absolute; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: var(--c); border: 1.5px solid rgba(255,255,255,.85); margin-left: 0 }
+.fm-slr { display: flex; align-items: center; gap: 8px }
+.fm-slr .fm-fig { width: 76px; flex: none }
+.fm-smg { border-radius: 9px; background: rgba(127,127,127,.1); padding: 0; border: 0; cursor: pointer; text-align: left; color: inherit; width: 100% }
+.fm-smg svg { display: block; width: 100%; height: 42px }
+.fm-smg small { display: block; color: var(--win-muted); font-size: 11px; padding: 2px 0 0 }
+
+/* Right-click menu */
+.fm-ctx { position: absolute; right: 118px; top: 28px; width: 190px; background: var(--win); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; z-index: 36 }
+.fm-ctx button { display: flex; width: 100%; align-items: center; gap: 6px; border: 0; background: none; color: var(--win-fg); font: inherit; padding: 3px 8px 3px 6px; border-radius: 5px; text-align: left; cursor: pointer }
+.fm-ctx button:hover { background: #2673C7; color: #fff }
+.fm-ctx .tk { width: 14px; display: inline-block; text-align: center }
+.fm-ctx hr { border: 0; border-top: 1px solid var(--line); margin: 3px 4px }
+
+/* Notification, practice box */
+.fm-banner { position: absolute; right: 12px; top: 36px; width: 250px; background: var(--win); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); padding: 9px 10px; z-index: 35; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; animation: fmpop .3s }
+.fm-banner b { display: block; font-size: 12.5px } .fm-banner .bd { font-size: 12px; line-height: 1.3; display: block }
+.fm-banner .bb { grid-column: 1 / -1; justify-self: end }
+.fm-practice { position: absolute; left: 12px; bottom: 12px; width: 250px; background: var(--win); border: 1px dashed var(--win-muted); border-radius: 11px; padding: 8px; z-index: 12; display: flex; flex-direction: column; gap: 4px }
+.fm-practice small { color: var(--win-muted); font-size: 11px; line-height: 1.3; margin-bottom: 2px }
+.fm-practice button { font: inherit; padding: 4px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--win-bar); color: var(--win-fg); cursor: pointer; text-align: left }
+.fm-mbtn { font: inherit; padding: 3px 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--win-bar); color: var(--win-fg); cursor: pointer }
+.fm-mbtn.prim { background: #2673C7; border-color: #2673C7; color: #fff }
+.fm-deck { position: absolute; right: 14px; bottom: 14px; width: 240px; background: #1D1F24; color: #fff; border-radius: 14px; padding: 8px 10px 10px; z-index: 12; box-shadow: var(--shadow) }
+.fm-deck small { display: block; color: #A9AFB8; font-size: 11px; margin-bottom: 6px }
+.fm-deck div { display: flex; gap: 8px }
+.fm-deck button { flex: 1; height: 62px; border: 0; border-radius: 9px; background: #343842; color: #fff; font: 600 14px var(--f-mac); cursor: pointer }
+
+/* Windows: Settings and the large graph */
+.fm-win { position: absolute; background: var(--win); border-radius: 11px; box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; z-index: 20; display: flex; flex-direction: column }
+.fm-tb { height: 28px; flex: none; background: var(--win-bar); display: flex; align-items: center; gap: 7px; padding: 0 11px; font-weight: 600 }
+.fm-dots { display: flex; gap: 6px; margin-right: 8px }
+.fm-dots i { width: 11px; height: 11px; border-radius: 50%; background: #E0605A; display: block; cursor: pointer }
+.fm-dots i:nth-child(2), .fm-dots i:nth-child(3) { background: rgba(127,127,127,.35); cursor: default }
+.fm-ttl { flex: 1; text-align: center; margin-right: 50px; color: var(--win-muted) }
+.fm-set { left: 230px; top: 34px; width: 440px; height: 516px }
+.fm-sh { display: flex; align-items: center; gap: 8px; padding: 9px 14px 4px }
+.fm-sh b { font-size: 16px } .fm-sh span { color: var(--win-muted) }
+.fm-tabs { display: flex; gap: 6px; padding: 4px 14px }
+.fm-tabs button { flex: 1; font: inherit; font-size: 12px; height: 26px; border: 0; background: rgba(127,127,127,.14); color: var(--win-fg); border-radius: 8px; cursor: pointer; white-space: nowrap }
+.fm-tabs button.on { color: #fff; font-weight: 600 }
+.fm-tabs .t-settings.on { background: var(--c-macf) } .fm-tabs .t-happened.on { background: var(--c-storyf) } .fm-tabs .t-guide.on { background: var(--c-fanf) } .fm-tabs .t-news.on { background: var(--c-heatf) }
+.fm-pane { position: relative; flex: 1; overflow: auto; padding: 8px 14px 6px; display: flex; flex-direction: column; gap: 12px; line-height: 1.35; font-size: 12px }
+.fm-pane h5 { margin: 0 0 2px; font-size: 13.5px } .fm-pane p { margin: 0 }
+.fm-pane small { display: block; color: var(--win-muted); font-size: 11px; line-height: 1.3 }
+.fm-row { display: flex; align-items: center; gap: 8px }
+.fm-sw { position: relative; width: 30px; height: 18px; border-radius: 9px; border: 0; background: rgba(127,127,127,.4); cursor: pointer; flex: none; padding: 0 }
+.fm-sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s }
+.fm-sw.on { background: var(--c-macf) } .fm-sw.on::after { left: 14px }
+.fm-sw.blue.on { background: var(--c-fanf) }
+.fm-sfoot { display: flex; align-items: center; gap: 8px; padding: 6px 14px 10px; font-size: 11px; color: var(--win-muted) }
+.fm-sub { display: flex; align-items: center; gap: 6px; margin-top: 3px }
+.fm-sub .fm-pill { background: color-mix(in srgb, var(--c-heat) 14%, transparent); color: var(--c-heat) }
+.fm-sub .fm-pill.on { background: var(--c-heatf); color: #fff }
+.fm-prog { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--c-fan) 25%, transparent); overflow: hidden; margin-top: 5px }
+.fm-prog i { display: block; height: 100%; background: var(--c-fanf); width: 0 }
+.fm-prog i.go { animation: fmgrow 3s linear forwards }
+.fm-hap { display: flex; gap: 8px } .fm-hap time { width: 50px; flex: none; color: var(--c-story); font-variant-numeric: tabular-nums }
+.fm-sign { display: flex; align-items: center; gap: 8px } .fm-sign i { width: 26px; height: 12px; border-radius: 3px; flex: none; display: block }
+
+/* The large graph */
+.fm-gwin { left: 18px; top: 34px; width: 600px; height: 516px; padding: 0 14px 10px }
+.fm-gwin .fm-tb { margin: 0 -14px 6px }
+.fm-gt { font-size: 15px; font-weight: 600; margin: 0 0 5px }
+.fm-spans { display: flex; gap: 6px; margin-bottom: 6px }
+.fm-spans button { border: 0; border-radius: 7px; height: 22px; padding: 0 10px; font-size: 11.5px; cursor: pointer; background: color-mix(in srgb, var(--c-fan) 14%, transparent); color: var(--c-fan) }
+.fm-spans button.on { background: var(--c-fanf); color: #fff }
+.fm-plots { display: flex; flex-direction: column; gap: 7px }
+.fm-hd { padding-left: 44px; font-size: 10.5px; white-space: nowrap; overflow: hidden; height: 15px; line-height: 15px }
+.fm-hd .nm { font-weight: 600; margin-right: 5px } .fm-hd .mu { color: var(--win-muted) } .fm-hd .ex { color: var(--win-muted); font-size: 9.5px; margin-left: 6px }
+.fm-hd .nw { color: var(--c-warn); font-weight: 600 }
+.fm-hd .sq { display: inline-block; width: 12px; height: 8px; border-radius: 2px; vertical-align: -1px; margin: 0 3px 0 6px }
+.fm-prow { display: flex; gap: 4px }
+.fm-ax { width: 40px; flex: none; position: relative; font-size: 9px; color: var(--win-muted); text-align: right }
+.fm-ax span { position: absolute; right: 2px }
+.fm-box { position: relative; width: 520px; flex: none; border-radius: 8px; background: rgba(127,127,127,.07); overflow: hidden }
+.fm-box svg { position: absolute; left: 0; top: 0 }
+.fm-st, .fm-bd, .fm-gp, .fm-ln { position: absolute }
+.fm-bd { background: rgba(127,127,127,.14) }
+.fm-gp { top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 9.5px; color: var(--win-muted); background: rgba(127,127,127,.06) }
+.fm-lw { position: absolute; font-size: 9px; font-weight: 500; padding: 0 3px; border-radius: 3px; background: color-mix(in srgb, var(--win) 72%, transparent); white-space: nowrap }
+.fm-nmk { position: absolute; top: 1px; font-size: 9px; color: var(--win-muted) }
+.fm-dot { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--c-warn); border: 1.5px solid var(--win); cursor: pointer }
+.fm-axb { display: flex; justify-content: space-between; padding: 2px 0 0 44px; font-size: 9.5px; color: var(--win-muted) }
+.fm-leg { display: flex; align-items: flex-end; gap: 8px; margin-top: 4px; font-size: 9.5px; color: var(--win-muted); line-height: 1.35 }
+
+/* Highlight */
+.target { z-index: 2; animation: fmring 1.6s ease-in-out infinite; border-radius: 7px }
+@keyframes fmring { 0%,100% { box-shadow: 0 0 0 2px #E6B53F, 0 0 0 6px rgba(230,181,63,.35) } 50% { box-shadow: 0 0 0 2px #E6B53F, 0 0 0 11px rgba(230,181,63,0) } }
+@keyframes fmpop { from { transform: translateY(8px); opacity: .3 } to { transform: none; opacity: 1 } }
+@keyframes fmgrow { from { width: 0 } to { width: 100% } }
+.fm-toast { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--good); color: #fff; font: 600 13px var(--f-body); padding: 7px 14px; border-radius: 20px; z-index: 50; animation: fmpop .3s; white-space: nowrap; max-width: 90% }
+:root[data-theme="dark"] .fm-toast { color: #10200F }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm-toast { color: #10200F } }
+
+/* Finish */
+.finish { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px }
+.finish h3 { font-family: var(--f-display); margin: 0 0 8px; font-size: 19px }
+.finish label { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-top: 1px solid var(--line); cursor: pointer }
+.finish input { width: 18px; height: 18px; accent-color: #2673C7; margin-top: 2px; flex: none }
+
+@media (max-width: 820px) {
+  .wrap { grid-template-columns: minmax(0,1fr) }
+  .rail { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px }
+  .brand { width: 100% }
+  .chap .n { display: none }
+  .railnote, .bar { width: 100% }
+  .coach { grid-template-columns: minmax(0,1fr) }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+</style>
+
+<div class="wrap">
+  <nav class="rail" id="rail" aria-label="Chapters"></nav>
+  <main class="main">
+    <section class="coach" id="coach" aria-live="polite"></section>
+    <div class="stagebox" id="stagebox"><div class="stage" id="stage"></div></div>
+    <section class="finish" id="finish" hidden></section>
+  </main>
+</div>
+
+<script>
+/* ---------- Icons: the fan and the gear are the app's own drawings from Icons.swift (24-pt grid, 1.9 stroke, round ends, no fill);
+   the rest are generic line icons in the same style. ---------- */
+const BLADE = 'M-0.86 -1.73C-2.11 -4.42 -4.42 -6.34 -3.46 -8.64C-2.5 -10.18 2.5 -9.98 4.42 -7.3C5.18 -5.95 3.07 -3.46 1.63 -1.06';
+const FAN = [0, 120, 240].map(a => `<path transform="translate(12 12) rotate(${a})" d="${BLADE}"/>`).join('') + '<circle cx="12" cy="12" r="2"/>';
+const GEAR = '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.3"/>' + Array.from({ length: 8 }, (_, k) => { const a = k * Math.PI / 4, c = Math.cos(a), s = Math.sin(a);
+  return `<path d="M${(12 + c * 6).toFixed(2)} ${(12 + s * 6).toFixed(2)}L${(12 + c * 8.6).toFixed(2)} ${(12 + s * 8.6).toFixed(2)}"/>`; }).join('');
+const ICON = {
+  fan: FAN, gear: GEAR,
+  sliders: 'M4 7h3 M7 7a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M11 7h9 M4 12h9 M13 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 12h3 M4 17h2 M6 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M10 17h10',
+  menu: 'M5 5.5h14 M5 12h14 M5 18.5h9',
+  graph: 'M4 4v16h16 M7 15l4-5 3 3 5-7',
+  bell: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z M10 20.5a2 2 0 0 0 4 0',
+  pulse: 'M3.5 12h4l2-5 4 10 2-5h5',
+  trophy: 'M7.5 3.5h9v5a4.5 4.5 0 0 1-9 0Z M7.5 5H4.5v1.5a3 3 0 0 0 3.3 3 M16.5 5h3v1.5a3 3 0 0 1-3.3 3 M12 13v3.5 M9.5 16.5h5l1 4h-7Z',
+};
+const icon = (n, cls = 'i') => { const v = ICON[n]; return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${v[0] === '<' ? v : `<path d="${v}"/>`}</svg>`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const glyph = (size, sw, inner = FAN, color = 'currentColor') => `<svg class="fm-glyph" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+/* The app tile: a flat calm blue with the white fan. */
+const tile = size => `<span class="fm-tile" style="width:${size}px;height:${size}px;border-radius:${size * .26}px" aria-hidden="true">${glyph(size * .74, 2.1, FAN, '#fff')}</span>`;
+
+/* ---------- The pretend app (simulator) ---------- */
+const LOW = 1499, TOP = [5348, 5776];
+const N = v => Math.round(v).toLocaleString('en-US');
+const TITLE = { automatic: 'Automatic', quiet: 'Quiet', cool: 'Cool', full: 'Full', my: 'My speed', follow: 'Follow temperature' };
+const LASTMIN = { '10': 10, '30': 30, '60': 60, until: null };
+const SW0 = { heat: true, battery: true, timed: false, calls: false, batt: true, sleep: false, hours: false };
+const START = () => ({
+  panel: false, settings: false, spage: 'settings', graph: false, menu: false, deck: false,
+  choice: 'automatic', reason: '', left: null, lasting: 'until', quietPct: 0, coolPct: 50, myPct: 50, start: 65, full: 95,
+  chip: 52, quietRest: true, heatLevel: 90, sw: { ...SW0 },
+  call: false, cable: true, before: 'automatic', before2: 'automatic', cu: 'idle',
+  note: null, banner: null, practice: [], toast: '', pt: null,
+});
+let S = START();
+const set = o => Object.assign(S, o);
+const timers = [];
+const later = (fn, ms) => { const h = setTimeout(fn, ms); timers.push(h); return h; };
+const clearTimers = () => { while (timers.length) clearTimeout(timers.pop()); };
+/* Every step starts from a full reset, then says what it needs. */
+const scene = o => { clearTimers(); S = Object.assign(START(), o); };
+
+const appDecides = () => S.choice !== 'automatic';
+function pct() {
+  const c = S.choice;
+  if (c === 'quiet') return S.quietPct / 100; if (c === 'cool') return S.coolPct / 100; if (c === 'full') return 1; if (c === 'my') return S.myPct / 100;
+  if (c === 'follow') return Math.min(1, Math.max(0, (S.chip - S.start) / (S.full - S.start)));
+  return null;
+}
+const resting = () => S.choice === 'quiet' && S.quietRest && S.chip <= 60;
+function speeds() {
+  if (S.cu === 'run') return TOP.slice();
+  const p = pct();
+  if (p === null) return S.chip >= 75 ? [1590, 1590] : [0, 0];
+  if (resting()) return [0, 0];
+  return TOP.map(t => Math.round(LOW + p * (t - LOW)));
+}
+const statusText = () => {
+  let t = appDecides() ? 'You decide: ' + TITLE[S.choice] : 'The Mac decides';
+  if (S.reason) t += ` (${S.reason})`;
+  if (resting()) t += ' · fans resting';
+  if (appDecides() && S.left) t += ` · ${S.left} min left`;
+  return t;
+};
+const hintOf = c => c === 'automatic' ? 'the Mac decides' : c === 'quiet' ? (S.quietPct <= 0 ? 'lowest speed' : S.quietPct + ' % speed') : c === 'cool' ? (S.coolPct === 50 ? 'half speed' : S.coolPct + ' % speed') : c === 'full' ? 'top speed' : '';
+const hoverWords = () => { const f = speeds(); return `${appDecides() ? 'Fans: you decide (' + TITLE[S.choice] + ')' : 'Fans: the Mac decides'}\nLeft ${N(f[0])} · Right ${N(f[1])} · Chip ${S.chip}°`; };
+
+const SL = { my: { k: 'myPct', min: 0, max: 100, step: 1 }, start: { k: 'start', min: 40, max: 85, step: 5 }, full: { k: 'full', min: 60, max: 100, step: 5 },
+  quiet: { k: 'quietPct', min: 0, max: 40, step: 5 }, cool: { k: 'coolPct', min: 30, max: 90, step: 5 } };
+const slider = (name, id) => { const c = SL[name], v = S[c.k], f = (v - c.min) / (c.max - c.min);
+  return `<div class="fm-sl" data-sl="${name}" data-t="${id || 'sl-' + name}" role="slider" aria-label="${name}" aria-valuenow="${v}"><i style="width:calc((100% - 16px) * ${f} + 10px)"></i><b style="left:calc((100% - 16px) * ${f})"></b></div>`; };
+const fig = (name, val) => `<div class="fm-fig"><span>${name}</span> <b>${val}</b></div>`;
+
+const BANNERS = {
+  heat: () => ({ body: `The chip has been at ${S.heatLevel}° or more for 5 minutes. Working hardest: Xcode.`, btn: 'Switch to Cool', act: 'switch-cool' }),
+  battery: () => ({ body: 'The battery has been above 35° for 10 minutes (now 37°).', btn: appDecides() ? '' : 'Switch to Cool', act: 'switch-cool' }),
+  timed: () => ({ body: S.timedOf + ' is over: chip 78° down to 61°. The Mac has the fans again.' }),
+};
+
+function panelHTML() {
+  const f = speeds(), on = c => S.choice === c;
+  const ch = (c, k, title, wide) => `<button class="fm-ch ${on(c) ? 'on' : ''} ${wide ? 'wide' : ''}" style="--w:var(--c-${k});--f:var(--c-${k}f)" data-act="choose" data-id="${c}" data-t="ch-${c}" aria-pressed="${on(c)}"><b>${title || TITLE[c]}</b>${hintOf(c) ? `<small>${hintOf(c)}</small>` : ''}</button>`;
+  const note = S.note ? `<div class="fm-note" data-t="note"><span>${esc(S.note.text)}</span><span class="fm-row"><button class="fm-wb full" data-act="none">Allow fan control…</button><button class="fm-wb" data-act="none">Not now</button></span></div>` : '';
+  const lasting = [['10', '10 min'], ['30', '30 min'], ['60', '1 hour'], ['until', 'Until I change']];
+  return (`<div class="fm-panel" data-t="panel">
+    <div class="fm-ph">${tile(22)}<b>AMS Fan Menu</b><span>0.7</span><span class="fm-sp"></span><button class="fm-gear" data-act="gear" data-t="gear" aria-label="Settings">${glyph(19, 1.9, GEAR)}</button></div>
+    ${note}
+    <div class="fm-rd" data-t="readings">
+      <div><div class="fm-cap" style="color:var(--c-fan)">Fans</div><div class="fm-fig"><span>Left</span> <b>${N(f[0])}</b> <span>·</span> <span>Right</span> <b>${N(f[1])}</b></div></div>
+      <div><div class="fm-cap" style="color:var(--c-heat)">Temperature</div><div class="fm-fig"><span>Chip</span> <b>${S.chip}°</b> <span>·</span> <span>Graphics</span> <b>${S.chip - 8}°</b> <span>·</span> <span>Battery</span> <b>36°</b></div>
+        <div class="fm-fig"><span>Storage</span> <b>41°</b> <span>·</span> <span>Case</span> <b>31°</b></div></div>
+      <div><div class="fm-cap" style="color:var(--c-power)">Power</div><div class="fm-fig"><span>Whole Mac</span> <b>42 W</b></div></div>
+    </div>
+    <div class="fm-status" data-t="status" style="color:var(--c-${appDecides() ? 'fan' : 'mac'})">${esc(statusText())}</div>
+    <div class="fm-chs">${ch('automatic', 'mac')}${ch('quiet', 'fan')}${ch('cool', 'fan')}${ch('full', 'fan')}</div>
+    <div class="fm-for" data-t="for"><span>For</span>${lasting.map(([k, l]) => `<button class="fm-pill ${S.lasting === k ? 'on' : ''}" data-act="lasting" data-id="${k}" data-t="for-${k}">${l}</button>`).join('')}</div>
+    ${ch('my', 'fan', `My speed ${S.myPct} %`, true)}${slider('my')}
+    ${ch('follow', 'heat', '', true)}
+    <div class="fm-slr">${fig('Start', S.start + '°')}${slider('start')}</div>
+    <div class="fm-slr">${fig('Full', S.full + '°')}${slider('full')}</div>
+    <button class="fm-smg" data-act="graph-small" data-t="smallgraph" aria-label="Open the large graph"><svg viewBox="0 0 276 54" preserveAspectRatio="none"><path d="M0 40L40 38L80 34L120 26L160 22L200 24L240 18L276 16" fill="none" stroke="var(--c-heat)" stroke-width="1.6" stroke-linejoin="round"/><path d="M0 50L110 50L112 30L276 30" fill="none" stroke="var(--c-fan)" stroke-width="1.6" stroke-linejoin="round"/><path d="M112 0V54" stroke="#888" stroke-dasharray="3 3"/></svg><small>Chip, last 15 minutes · tap for the large graph</small></button>
+  </div>`);
+}
+
+const PRACTICE = {
+  rclick: () => 'Right-click the fan mark (for a mouse with no right button)',
+  heat: () => `The chip stays at ${S.heatLevel}° for 5 minutes`,
+  battery: () => 'The battery stays above 35° for 10 minutes',
+  call: () => S.call ? 'The call ends (microphone free for 30 seconds)' : 'A call starts (microphone in use for 15 seconds)',
+  cable: () => S.cable ? 'Pull the power cable' : 'Put the power cable back',
+  timeup: () => 'The 10 minutes are up',
+};
+
+/* ---- Settings window ---- */
+const swRow = (key, label, words, extra = '') => `<div data-t="sw-${key}"><div class="fm-row"><b style="font-weight:500">${label}</b><span class="fm-sp"></span><button class="fm-sw ${S.sw[key] ? 'on' : ''}" role="switch" aria-checked="${S.sw[key]}" aria-label="${label}" data-act="sw" data-k="${key}"></button></div><small>${words}</small>${extra}</div>`;
+const HAPPENED = [['20:12', 'Cool for 10 min: chip 78° down to 61°'], ['20:02', 'Cool for 10 minutes'], ['17:41', 'On battery: the Mac has the fans again'], ['16:20', 'A call began: Quiet'], ['12:05', 'Battery heat notice: the battery was above 35° for 10 minutes'], ['07:00', 'Quiet hours ended: the Mac has the fans again'], ['Tue 22:00', 'Quiet hours began: Quiet']];
+const SIGNS = [['#1F69C2', 'Blue fan mark', 'Your choice is on, not Automatic.'], ['#1C7347', 'Green', 'The Mac decides (Automatic). Also the line where the Mac itself took the fans to full.'], ['#2673C7', 'Blue', 'A fan speed you set, and the fan speed line in a graph.'], ['#C44D24', 'Coral', 'Temperature.'], ['#8F5900', 'Amber', 'A note that needs your eye; a line from where a temperature needs your eye; the small dot in a graph where a notice was sent.'], ['#C71A24', 'Red line in a graph', 'Too hot: from here something protects itself.'], ['#888', 'Dotted grey line', 'A rough figure from other owners’ reports, not from Apple.'], ['#07707A', 'Teal', 'Electric power; pale in the Battery graph: the battery was charging.']];
+function settingsPage() {
+  if (S.spage === 'happened') return `<div><h5 style="color:var(--c-story)">The last 7 days</h5><div class="fm-fig"><span>Hottest</span> <b>93° · Tue 14:20</b></div><div class="fm-fig"><span>At 90° or more</span> <b>12 min</b></div><div class="fm-fig"><span>Fans turning</span> <b>5 h 10 min</b></div><div class="fm-fig"><span>A choice of yours on</span> <b>1 h 5 min</b></div></div>
+    <div data-t="happened"><h5 style="color:var(--c-story)">What happened</h5><small style="margin-bottom:5px">The last 20 things the app did, newest first.</small>${HAPPENED.map(([t, w]) => `<div class="fm-hap"><time>${t}</time><span>${w}</span></div>`).join('')}</div>`;
+  if (S.spage === 'guide') return `<div><b style="color:var(--c-fan)">What this app is for</b><p>The Mac has no setting of its own for how fast its fans turn. AMS Fan Menu gives you one. It lives in the menu bar at the top of the screen and has no Dock icon.</p></div>
+    <div><b style="color:var(--c-fan)">The menu bar</b><p>You see a small hand-drawn fan mark and no figure. The mark is black (white at night) while the Mac decides, and blue while AMS Fan Menu runs the fans. …</p></div>
+    <div><b style="color:var(--c-fan)">The six choices</b><p>Automatic, Quiet, Cool, Full, My speed and Follow temperature. …</p></div>
+    <div data-t="signs"><b style="color:var(--c-fan)">Signs in this app</b>${SIGNS.map(([c, n, m]) => `<div class="fm-sign" style="margin-top:4px"><i style="background:${c}"></i><span><b>${n}</b>: ${m}</span></div>`).join('')}</div>
+    <small>On your Mac this page goes on, part by part.</small>`;
+  if (S.spage === 'news') return `<div><b style="color:var(--c-heat)">0.7</b>
+      ${['New: right-click (or control-click) the fan mark for a short menu: Automatic, Cool for 10 min, Graphs…, Settings….', 'New: the heat notice names the app working hardest.', 'New: a small amber dot in a graph where a notice was sent. Point at it and the heading shows the notice’s words.', 'New: Settings, “Fan check-up”, with the button “Check the fans”.', 'New: a notice if a fan stays well below the speed the app asked for.', 'New: AMS Deck Mate has a “Fans 1,650” key next to “Chip 69°”.'].map(t => `<p>– ${t}</p>`).join('')}</div>
+    <div><b style="color:var(--c-heat)">0.6</b><p>– New: charging in the Battery graph.<br>– New: a gap says why (“asleep”, “not running”).<br>– New: the small graph may show another temperature.<br>– New: a word when a timed choice ends. …</p></div>
+    <small>On your Mac this list goes back to the first version.</small>`;
+  const heatSub = `<div class="fm-sub" style="${S.sw.heat ? '' : 'opacity:.4'}"><span style="color:var(--win-muted)">From</span>${[80, 85, 90, 95].map(l => `<button class="fm-pill ${S.heatLevel === l ? 'on' : ''}" data-act="level" data-id="${l}">${l}°</button>`).join('')}</div>`;
+  const cu = S.cu === 'run' ? `<div class="fm-prog"><i class="go"></i></div><small style="margin-top:4px">Checking the fans… each one runs to its top. (In this practice copy about 3 seconds, not 10.)</small>`
+    : S.cu === 'done' ? `<small data-t="cu-line" style="color:var(--win-fg);font-size:12px;margin-top:5px"><b>Both fans fine · Left 5,310 of 5,348 · Right 5,750 of 5,776</b></small>` : '';
+  return (`<div class="fm-row"><b style="font-weight:500">Open at login</b><span class="fm-sp"></span><span class="fm-sw on" style="pointer-events:none"></span></div>
+    <div><h5 style="color:var(--c-fan)">Fan control helper</h5><small style="font-size:12px;color:var(--win-fg)">In place. AMS Fan Menu can set the fans.</small></div>
+    <div><h5 style="color:var(--c-fan)">Your speeds</h5><div class="fm-slr">${fig('Quiet', S.quietPct + ' %')}${slider('quiet')}</div><div class="fm-slr">${fig('Cool', S.coolPct + ' %')}${slider('cool')}</div><small>What the Quiet and Cool buttons mean. 0 % is each fan’s lowest speed, 100 % its top.</small></div>
+    <div data-t="sec-checkup"><h5 style="color:var(--c-fan)">Fan check-up</h5><small style="margin-bottom:6px">Each fan runs to its top for about 10 seconds, then the fans go back to what they did before. A fan that gets to 90 % of its top is fine. While the app runs the fans, a notification comes by itself when a fan stays well below the speed asked for, for 30 seconds.</small>
+      <button class="fm-wb full" data-act="checkup" data-t="checkup-btn" style="height:26px;padding:0 14px">Check the fans</button>${cu}</div>
+    <div data-t="sec-byitself" style="display:flex;flex-direction:column;gap:9px"><h5 style="color:var(--c-mac);margin:0">By itself</h5>
+      ${swRow('heat', 'Heat notice', `While the Mac decides: a notification when the chip has been at ${S.heatLevel}° or more for 5 minutes, with the button “Switch to Cool”. It names the app working hardest.`, heatSub)}
+      ${swRow('battery', 'Battery heat notice', 'A notification when the battery has been above 35° for 10 minutes. At most once an hour.')}
+      ${swRow('timed', 'A word when a timed choice ends', 'A notification when a choice with a time ends, for example “Cool is over: chip 78° down to 61°. The Mac has the fans again.”')}
+      ${swRow('calls', 'Quiet during calls', 'When an app has used the microphone for 15 seconds, the app switches to Quiet; 30 seconds after the microphone is free, your choice from before comes back.')}
+      ${swRow('batt', 'On battery: the Mac decides', 'When the power cable is pulled, the fans go back to the Mac. With the cable back in, your choice comes back.')}
+      ${swRow('sleep', 'Choice back after sleep', 'Sleep always hands the fans to the Mac. With this on, your choice comes back about 5 seconds after the Mac wakes.')}
+      ${swRow('hours', 'Quiet hours', 'Between the two times Quiet comes on by itself. Afterwards your choice from before comes back. Your own tap during the hours wins until they are over.', `<div class="fm-sub" style="${S.sw.hours ? '' : 'opacity:.4'}"><span style="color:var(--win-muted)">From</span><b>22:00</b><span style="color:var(--win-muted);margin-left:8px">To</span><b>07:00</b></div>`)}
+    </div>
+    <div><h5 style="color:var(--c-heat)">Safety</h5><small style="font-size:12px;color:var(--win-fg)">Quit, sleep and restart always hand the fans back to the Mac. So does a processor core at 100° or more for 15 seconds, except in Full.</small></div>`);
+}
+function settingsHTML() {
+  return `<div class="fm-win fm-set" data-t="settings"><div class="fm-tb"><span class="fm-dots"><i data-act="close-settings"></i><i></i><i></i></span><span class="fm-ttl">AMS Fan Menu</span></div>
+    <div class="fm-sh">${tile(26)}<b>AMS Fan Menu</b><span>0.7</span></div>
+    <div class="fm-tabs">${[['settings', 'Settings'], ['happened', 'What happened'], ['guide', 'How it works'], ['news', 'What’s new']].map(([k, l]) => `<button class="t-${k} ${S.spage === k ? 'on' : ''}" data-act="spage" data-p="${k}" data-t="page-${k}">${l}</button>`).join('')}</div>
+    <div class="fm-pane">${settingsPage()}</div>
+    <div class="fm-sfoot">Version 0.7 (10)<span class="fm-sp"></span><button class="fm-mbtn" data-act="none">Quit AMS Fan Menu</button><button class="fm-mbtn prim" data-act="close-settings" data-t="done">Done</button></div></div>`;
+}
+
+/* ---- The large graph: one hour, drawn from a small made-up history ---- */
+const PW = 520, GAP = [.62, .74], DOT = { chip: .93, battery: .44 }, MARKS = [[.12, 'Cool'], [.32, 'Automatic']];
+const interp = (pts, t) => { for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) { const a = pts[i - 1], b = pts[i]; return a[1] + (b[1] - a[1]) * (t - a[0]) / (b[0] - a[0]); } return pts[pts.length - 1][1]; };
+const CHIP = [[0, 52], [.06, 60], [.12, 78], [.2, 70], [.32, 62], [.4, 60], [.5, 58], [.62, 57], [.74, 60], [.8, 86], [.84, 90], [.95, 94], [1, 94]];
+const BAT = [[0, 31], [.08, 31], [.3, 36.8], [.4, 37.4], [.62, 36.6], [.74, 35.8], [1, 35.2]];
+const FL = [[0, 0], [.1, 0], [.105, 1590], [.119, 1590], [.12, 3424], [.319, 3424], [.32, 0], [.79, 0], [.8, 1590], [1, 1590]];
+const FR = [[0, 0], [.1, 0], [.105, 1590], [.119, 1590], [.12, 3638], [.319, 3638], [.32, 0], [.79, 0], [.8, 1590], [1, 1590]];
+const inGap = t => t >= GAP[0] && t <= GAP[1];
+const chipV = t => interp(CHIP, t) + 1.1 * Math.sin(t * 47), batV = t => interp(BAT, t) + .15 * Math.sin(t * 47);
+const fanV = (i, t) => { const v = interp(i ? FR : FL, t); return v > 2000 ? v + 25 * Math.sin(t * 90) : v; };
+const clk = t => { const m = Math.round(14 * 60 + 40 - (1 - t) * 60); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+const near = (t, k) => t != null && Math.abs(t - DOT[k]) < .02;
+
+function plot(o) {
+  const h = o.h, y = v => h - 4 - (v - o.lo) / (o.hi - o.lo) * (h - 8), pt = S.pt;
+  const path = fn => [[0, GAP[0]], [GAP[1], 1]].map(([a, b]) => { let d = ''; for (let t = a; t <= b + 1e-9; t += .005) d += (d ? 'L' : 'M') + (t * PW).toFixed(1) + ' ' + y(fn(t)).toFixed(1); return d; }).join('');
+  let svg = '';
+  MARKS.forEach(([t]) => { svg += `<path d="M${t * PW} 0V${h}" stroke="#888" stroke-width="1" stroke-dasharray="3 3"/>`; });
+  (o.levels || []).forEach(L => { svg += `<path d="M0 ${y(L.v)}H${PW}" stroke="${L.c}" stroke-width="1" ${L.dot ? 'stroke-dasharray="1.5 3" stroke-linecap="round"' : ''} opacity=".9"/>`; });
+  o.series.forEach(s => { svg += `<path d="${path(s.fn)}" fill="none" stroke="${s.c}" stroke-opacity="${s.op || 1}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`; });
+  if (pt != null) { svg += `<path d="M${pt * PW} 0V${h}" stroke="currentColor" stroke-opacity=".45"/>`;
+    if (!inGap(pt)) o.series.forEach(s => { svg += `<circle cx="${pt * PW}" cy="${y(s.fn(pt))}" r="2.5" fill="currentColor" fill-opacity=".45"/>`; }); }
+  let html = '';
+  if (o.band) html += `<div class="fm-bd" ${o.key === 'chip' ? 'data-t="band"' : ''} style="left:0;width:100%;top:${y(o.band[1])}px;height:${y(o.band[0]) - y(o.band[1])}px"></div>`;
+  if (o.stretch) html += `<div class="fm-st" ${o.stretch.t ? `data-t="${o.stretch.t}"` : ''} style="left:${o.stretch.a * PW}px;width:${(o.stretch.b - o.stretch.a) * PW}px;top:0;height:100%;background:color-mix(in srgb, ${o.stretch.c} 16%, transparent)"></div>`;
+  html += `<div class="fm-gp" ${o.key === 'chip' ? 'data-t="gap"' : ''} style="left:${GAP[0] * PW}px;width:${(GAP[1] - GAP[0]) * PW}px">asleep</div>`;
+  (o.levels || []).forEach(L => { html += `<div class="fm-ln" ${L.t ? `data-t="${L.t}"` : ''} style="left:0;width:100%;top:${y(L.v) - 6}px;height:12px"></div>`;
+    html += `<span class="fm-lw" style="${L.side === 'l' ? 'left:2px' : 'right:2px'};top:${L.below ? y(L.v) + 1 : y(L.v) - 12}px;color:${L.wc || L.c}">${L.words}</span>`; });
+  if (o.names) MARKS.forEach(([t, n]) => { html += `<span class="fm-nmk" style="left:${t * PW + 3}px">${n}</span>`; });
+  (o.dots || []).forEach(d => { html += `<div class="fm-dot" data-dot="${d.k}" ${d.k === 'chip' ? 'data-t="dot-chip"' : ''} style="left:${DOT[d.k] * PW}px;top:${y(d.v)}px" title="A notice was sent here"></div>`; });
+  const ax = o.axis.map(v => `<span style="top:${y(v) - 5}px">${o.fmt ? o.fmt(v) : v + '°'}</span>`).join('');
+  return `<div><div class="fm-hd">${o.head}</div><div class="fm-prow"><div class="fm-ax" style="height:${h}px">${ax}</div><div class="fm-box" data-t="plot-${o.key}" style="height:${h}px"><svg width="${PW}" height="${h}" style="color:var(--win-fg)">${svg}</svg>${html}</div></div></div>`;
+}
+function graphHTML() {
+  const pt = S.pt, gap = pt != null && inGap(pt), at = pt != null ? ` <span class="mu">at ${clk(pt)}</span>` : '';
+  const T = pt != null ? pt : 1, heatOn = S.sw.heat;
+  const chipHead = `<span class="nm" style="color:var(--c-heat)">Chip temperature</span>` + (near(pt, 'chip') ? `<span class="nw">${esc(BANNERS.heat().body)}</span>` : gap ? `<b>asleep</b>${at}` : `<b>${Math.round(chipV(T))}°</b>${at}`)
+    + (near(pt, 'chip') ? '' : `<span class="ex">usual here 50° to 86° · fans at full in Automatic: not seen yet</span>`);
+  const batHead = `<span class="nm" style="color:var(--c-heat)">Battery temperature</span>` + (near(pt, 'battery') ? `<span class="nw">${esc(BANNERS.battery().body)}</span>` : gap ? `<b>asleep</b>${at}` : `<b>${Math.round(batV(T))}°</b>${at}`)
+    + (near(pt, 'battery') ? '' : `<span class="ex">usual here 31° to 37°</span><span class="sq" style="background:color-mix(in srgb, var(--c-power) 35%, transparent)"></span><span class="ex" style="margin:0">charging</span>`);
+  const fanHead = `<span class="nm" style="color:var(--c-fan)">Fan speed</span>` + (gap ? `<b>asleep</b>${at}` : `<b>Left ${N(fanV(0, T))} · Right ${N(fanV(1, T))}</b>${at}`);
+  const chipLevels = [
+    ...(heatOn ? [{ v: S.heatLevel, c: 'var(--c-warn)', words: `Heat notice ${S.heatLevel}°`, below: true, t: 'line-amber' }] : []),
+    { v: 100, c: 'var(--c-danger)', words: 'Too hot 100°', t: 'line-red' },
+    { v: 95, c: '#888', dot: 1, words: 'Reports: fans speed up at about 95°', side: 'l', below: true, wc: 'var(--win-muted)', t: 'line-report' },
+    { v: 105, c: '#888', dot: 1, words: 'Reports: chip slows itself at about 100° to 110°', side: 'l', wc: 'var(--win-muted)', t: 'line-report2' },
+  ];
+  return `<div class="fm-win fm-gwin" data-t="gwin"><div class="fm-tb"><span class="fm-dots"><i data-act="gclose"></i><i></i><i></i></span><span class="fm-ttl">Temperature and fan speed</span></div>
+    <div class="fm-gt">Temperature and fan speed</div>
+    <div class="fm-spans">${['15 minutes', '1 hour', '6 hours'].map(l => `<button class="${l === '1 hour' ? 'on' : ''}" data-act="span">${l}</button>`).join('')}</div>
+    <div class="fm-plots" data-t="plots">
+      ${plot({ key: 'chip', h: 140, lo: 40, hi: 120, axis: [120, 80, 40], head: chipHead, band: [50, 86], levels: chipLevels, dots: [{ k: 'chip', v: chipV(DOT.chip) }], series: [{ fn: chipV, c: 'var(--c-heat)' }] })}
+      ${plot({ key: 'battery', h: 64, lo: 20, hi: 50, axis: [50, 35, 20], head: batHead, band: [31, 37], stretch: { a: .08, b: .42, c: 'var(--c-power)' },
+        levels: [{ v: 35, c: 'var(--c-warn)', words: 'Apple’s limit for the room 35°', below: true }, { v: 44, c: 'var(--c-danger)', words: 'Charging may stop about 44°' }], dots: [{ k: 'battery', v: batV(DOT.battery) }], series: [{ fn: batV, c: 'var(--c-heat)' }] })}
+      ${plot({ key: 'fan', h: 84, lo: 0, hi: 5776, axis: [5776, 2888, 0], fmt: v => N(v), head: fanHead, stretch: { a: .12, b: .32, c: 'var(--c-fan)', t: 'stretch' }, names: true,
+        series: [{ fn: t => fanV(0, t), c: 'var(--c-fan)' }, { fn: t => fanV(1, t), c: 'var(--c-fan)', op: .55 }] })}
+    </div>
+    <div class="fm-axb"><span>1 hour ago</span><span>now</span></div>
+    <div class="fm-leg"><span>Coral = temperature · blue = fan speed · dashed line = you changed the choice<br>Dotted grey = owners’ reports, not Apple · no figure for when the Mac turns itself off</span><span class="fm-sp"></span><button class="fm-mbtn prim" data-act="gclose" data-t="gdone">Done</button></div></div>`;
+}
+
+function renderStage() {
+  const st = document.getElementById('stage'), oldPane = st.querySelector('.fm-pane'), keep = oldPane ? oldPane.scrollTop : 0;
+  const blue = appDecides();
+  const bar = `<div class="fm-mbar"><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span>Go</span><span class="fm-sp"></span>
+      <button class="fm-item ${S.panel || S.menu ? 'open' : ''}" data-act="item" data-t="item" aria-label="AMS Fan Menu, ${blue ? 'you decide' : 'the Mac decides'}" style="color:${blue ? 'var(--c-fan)' : 'var(--menubar-fg)'}">${glyph(18, 2, FAN)}<span class="fm-tip">${esc(hoverWords()).replace('\n', '<br>')}</span></button>
+      <span>Wed 25 Nov&nbsp; 14:40</span></div>`;
+  const menu = S.menu ? `<div class="fm-ctx" data-t="menu" role="menu"><button data-act="m-auto" data-t="m-auto"><span class="tk">${blue ? '' : '✓'}</span>Automatic</button><button data-act="m-cool" data-t="m-cool"><span class="tk"></span>Cool for 10 min</button><hr><button data-act="m-graphs" data-t="m-graphs"><span class="tk"></span>Graphs…</button><button data-act="m-settings" data-t="m-settings"><span class="tk"></span>Settings…</button></div>` : '';
+  const banner = S.banner ? `<div class="fm-banner" data-t="banner">${tile(26)}<div><b>AMS Fan Menu</b><span class="bd">${esc(S.banner.body)}</span></div>${S.banner.btn ? `<button class="fm-mbtn bb" data-act="banner-btn" data-t="banner-btn">${S.banner.btn}</button>` : ''}</div>` : '';
+  const practice = S.practice.length ? `<div class="fm-practice" data-t="practice"><small>Practice box. It is not in the real app. It stands in for things that happen on your Mac.</small>${S.practice.map(k => `<button data-act="p-${k}" data-t="p-${k}">${PRACTICE[k]()}</button>`).join('')}</div>` : '';
+  const sp = speeds(), mean = Math.max(sp[0], sp[1]);
+  const deck = S.deck ? `<div class="fm-deck" data-t="deck"><small>AMS Deck (practice copy)</small><div><button data-act="deck-key" data-id="chip" data-t="deck-chip">Chip 69°</button><button data-act="deck-key" data-id="fans" data-t="deck-fans">${mean > 0 ? 'Fans ' + N(mean) : 'Fans off'}</button></div></div>` : '';
+  st.innerHTML = `${bar}${S.panel ? panelHTML() : ''}${menu}${banner}${practice}${deck}${S.settings ? settingsHTML() : ''}${S.graph ? graphHTML() : ''}${S.toast ? `<div class="fm-toast">${esc(S.toast)}</div>` : ''}`;
+  const np = st.querySelector('.fm-pane'); if (np) np.scrollTop = keep;
+  markTarget();
+}
+function toast(t) { S.toast = t; renderStage(); clearTimeout(toast.h); toast.h = setTimeout(() => { S.toast = ''; renderStage(); }, 2600); }
+
+function choose(c, how) { set({ choice: c, reason: '', left: c === 'automatic' ? null : LASTMIN[S.lasting], call: false, banner: S.banner && S.banner.act === 'switch-cool' ? null : S.banner }); renderStage(); emit('choose', c); }
+function openMenu() { set({ panel: false, menu: !S.menu }); renderStage(); if (S.menu) emit('menu-open'); }
+
+const stage = document.getElementById('stage');
+let drag = null;
+function slide(name, clientX) {
+  const c = SL[name], el = stage.querySelector(`[data-sl="${name}"]`); if (!el) return;
+  const r = el.getBoundingClientRect(); if (!r.width || !el.offsetWidth) return; const k = r.width / el.offsetWidth, f = Math.min(1, Math.max(0, (clientX - r.left - 8 * k) / (r.width - 16 * k)));
+  let v = Math.round((c.min + f * (c.max - c.min)) / c.step) * c.step; v = Math.min(c.max, Math.max(c.min, v));
+  S[c.k] = v;
+  if (name === 'start' && S.full - S.start < 10) S.full = Math.min(100, S.start + 10), S.start = Math.min(S.start, S.full - 10);
+  if (name === 'full' && S.full - S.start < 10) S.start = Math.max(40, S.full - 10), S.full = Math.max(S.full, S.start + 10);
+  if (name === 'my' && S.choice !== 'my') { S.choice = 'my'; S.reason = ''; S.left = LASTMIN[S.lasting]; }
+  renderStage(); emit('slide', name);
+}
+stage.addEventListener('mousedown', ev => { const s = ev.target.closest('[data-sl]'); if (s) { drag = s.dataset.sl; slide(drag, ev.clientX); ev.preventDefault(); } });
+document.addEventListener('mousemove', ev => { if (drag) slide(drag, ev.clientX); });
+document.addEventListener('mouseup', () => { drag = null; });
+stage.addEventListener('contextmenu', ev => { if (ev.target.closest('.fm-item')) { ev.preventDefault(); openMenu(); } });
+stage.addEventListener('mouseover', ev => { if (ev.target.closest('.fm-item')) emit('hover'); });
+stage.addEventListener('mousemove', ev => {
+  if (!S.graph || drag) return;
+  const dot = ev.target.closest('[data-dot]'), b = ev.target.closest('.fm-box'); let t = null;
+  if (dot) t = DOT[dot.dataset.dot]; else if (b) { const r = b.getBoundingClientRect(); if (!r.width) return; t = (ev.clientX - r.left) / r.width; }
+  if (t !== null) t = Math.round(Math.min(1, Math.max(0, t)) * 200) / 200;
+  if (t === S.pt) return;
+  S.pt = t; renderStage();
+  if (t !== null) emit('point', inGap(t) ? 'gap' : (near(t, 'chip') || near(t, 'battery')) ? 'dot' : 'plain');
+});
+
+/* Clicks inside the pretend Mac */
+stage.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-act]');
+  if (!el) {
+    if (S.panel && !ev.target.closest('.fm-panel, .fm-practice, .fm-banner')) { S.panel = false; renderStage(); emit('panel-close'); }
+    else if (S.menu && !ev.target.closest('.fm-ctx, .fm-practice')) { S.menu = false; renderStage(); }
+    return; }
+  const a = el.dataset.act, id = el.dataset.id;
+  switch (a) {
+    case 'item': if (ev.ctrlKey) { openMenu(); break; }
+      set({ menu: false, panel: !S.panel }); if (S.panel) set({ settings: false, graph: false }); renderStage(); emit(S.panel ? 'panel-open' : 'panel-close'); break;
+    case 'gear': set({ panel: false, settings: true, spage: 'settings', graph: false }); renderStage(); emit('settings'); break;
+    case 'choose': choose(id); break;
+    case 'lasting': S.lasting = id; if (appDecides()) S.left = LASTMIN[id]; renderStage(); emit('lasting', id); break;
+    case 'graph-small': set({ panel: false, graph: true, settings: false, pt: null }); renderStage(); emit('graph-open', 'small'); break;
+    case 'm-auto': set({ menu: false }); choose('automatic'); break;
+    case 'm-cool': set({ menu: false, lasting: S.lasting }); choose('cool'); S.left = 10; renderStage(); break;
+    case 'm-graphs': set({ menu: false, graph: true, settings: false, pt: null }); renderStage(); emit('graph-open', 'menu'); break;
+    case 'm-settings': set({ menu: false, settings: true, spage: 'settings', graph: false }); renderStage(); emit('settings'); break;
+    case 'gclose': set({ graph: false, pt: null }); renderStage(); emit('graph-close'); break;
+    case 'span': toast('In this practice copy the graph stays on 1 hour.'); break;
+    case 'deck-key': set({ deck: false, graph: true, pt: null }); renderStage(); emit('graph-open', 'deck'); break;
+    case 'spage': S.spage = el.dataset.p; renderStage(); emit('tab', S.spage); break;
+    case 'close-settings': S.settings = false; renderStage(); emit('settings-close'); break;
+    case 'sw': { const k = el.dataset.k; S.sw[k] = !S.sw[k]; renderStage(); emit('sw', { k, on: S.sw[k] }); break; }
+    case 'level': S.heatLevel = +id; renderStage(); break;
+    case 'banner-btn': { const act = S.banner && S.banner.act; if (act === 'switch-cool') { S.banner = null; choose('cool'); } break; }
+    case 'checkup':
+      if (S.cu === 'run') break;
+      S.cu = 'run'; renderStage(); emit('checkup');
+      later(() => { S.cu = 'done'; renderStage(); emit('checkup-done'); }, 3000); break;
+    case 'p-rclick': openMenu(); break;
+    case 'p-heat':
+      if (!S.sw.heat) { toast('The Heat notice switch is off, so no notice comes.'); break; }
+      if (appDecides()) { toast('A choice of yours is on. The heat notice only comes while the Mac decides.'); break; }
+      S.banner = BANNERS.heat(); renderStage(); emit('heat'); break;
+    case 'p-battery':
+      if (!S.sw.battery) { toast('The Battery heat notice switch is off, so no notice comes.'); break; }
+      S.banner = BANNERS.battery(); renderStage(); emit('battery'); break;
+    case 'p-call':
+      if (!S.call) {
+        if (!S.sw.calls) { toast('Quiet during calls is off, so nothing changes.'); break; }
+        set({ before: S.choice, choice: 'quiet', reason: 'during a call', call: true, left: null }); renderStage(); emit('call-start'); }
+      else { set({ choice: S.before, reason: '', call: false, left: null }); renderStage(); emit('call-end'); }
+      break;
+    case 'p-cable':
+      if (S.cable) {
+        if (S.sw.batt && appDecides()) set({ before2: S.choice, choice: 'automatic', reason: 'on battery', left: null });
+        S.cable = false; renderStage(); emit('cable-out'); }
+      else {
+        if (S.reason === 'on battery') set({ choice: S.before2, reason: '', left: LASTMIN[S.lasting] });
+        S.cable = true; renderStage(); emit('cable-back'); }
+      break;
+    case 'p-timeup':
+      if (!appDecides()) { toast('No choice of yours is on.'); break; }
+      S.timedOf = TITLE[S.choice]; set({ choice: 'automatic', reason: '', left: null });
+      if (S.sw.timed) { S.banner = BANNERS.timed(); renderStage(); emit('time-up', true); }
+      else { toast('The Mac has the fans again. “A word when a timed choice ends” is off, so no notice.'); emit('time-up', false); }
+      break;
+    default: break;
+  }
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape') return;
+  if (S.graph) { S.graph = false; S.pt = null; renderStage(); emit('graph-close'); }
+  else if (S.settings) { S.settings = false; renderStage(); emit('settings-close'); }
+  else if (S.menu) { S.menu = false; renderStage(); }
+  else if (S.panel) { S.panel = false; renderStage(); emit('panel-close'); }
+});
+
+/* ---------- Lessons (see → try → check). Every step's setup resets what that step needs. ---------- */
+const SETTINGS_ON = { settings: true, spage: 'settings' };
+const LESSONS = [
+  { title: 'The fan mark', icon: 'fan', steps: [
+    { kind: 'look', head: 'Always in your menu bar', text: 'A small hand-drawn fan mark, and no figure. The app has no Dock icon. The mark is black (white at night) while the Mac decides how fast the fans turn.', target: 'item', setup: () => scene({}) },
+    { kind: 'look', head: 'Blue: you decide', text: 'The mark is blue while AMS Fan Menu runs the fans. That is true for every choice except Automatic.', target: 'item', setup: () => scene({ choice: 'cool', left: 10 }) },
+    { kind: 'try', head: 'Point at the mark', text: 'Move the pointer onto the fan mark and wait a moment.', target: 'item', setup: () => scene({ choice: 'quiet', chip: 68 }), wait: 'hover', ok: 'It says who decides, for example "Fans: you decide (Quiet)", and under that the figures: Left, Right and Chip. A click opens the panel.' },
+    { kind: 'look', head: 'One colour, one meaning', text: 'Green: the Mac decides. Blue: a speed you set. Coral: temperature. Amber: a note that needs your eye. Teal: power. Red only shows in graphs, as the "too hot" level line.', target: 'status', setup: () => scene({ panel: true }) },
+    { kind: 'check', head: 'Quick check', text: 'The fan mark is blue. What does that mean?', answers: ['A choice of yours is on, not Automatic', 'The Mac is too hot', 'The fan helper is missing'], right: 0, ok: 'Right. Black or white: the Mac decides. Blue: you do.', setup: () => scene({ choice: 'full' }) },
+  ]},
+  { title: 'The panel', icon: 'sliders', steps: [
+    { kind: 'try', head: 'Open the panel', text: 'Click the fan mark.', target: 'item', setup: () => scene({}), wait: 'panel-open', ok: 'The panel opens under the mark. The app you work in keeps the keyboard.' },
+    { kind: 'look', head: 'The readings', text: 'Fans: Left and Right, in turns a minute. Temperature: Chip, Graphics and Battery, then Storage and Case. Power, in teal: the Whole Mac in watts. When the Mac is cool, Automatic often stops the fans, so they show 0.', target: 'readings', setup: () => scene({ panel: true }) },
+    { kind: 'try', head: 'Quiet', text: 'Press "Quiet".', target: 'ch-quiet', setup: () => scene({ panel: true, chip: 52 }), wait: 'choose', when: d => d === 'quiet', ok: 'Both fans are held at their lowest running speed (1,499 on this Mac). The chip is cool, so Quiet lets the fans stop: "You decide: Quiet · fans resting".' },
+    { kind: 'try', head: 'Cool', text: 'Press "Cool".', target: 'ch-cool', setup: () => scene({ panel: true, chip: 70 }), wait: 'choose', when: d => d === 'cool', ok: 'Half speed: about 3,424 on the left fan and 3,638 on the right. The choice in use is full colour with white words; the others are pale.' },
+    { kind: 'try', head: 'Full', text: 'Press "Full".', target: 'ch-full', setup: () => scene({ panel: true, chip: 70 }), wait: 'choose', when: d => d === 'full', ok: 'The top speed of each fan: 5,348 on the left, 5,776 on the right. A speed is never below a fan’s lowest or above its top.' },
+    { kind: 'try', head: 'My speed', text: 'Drag the slider under "My speed".', target: 'sl-my', setup: () => scene({ panel: true, chip: 70 }), wait: 'slide', when: d => d === 'my', ok: 'Dragging the slider switches to My speed. 0 % is each fan’s lowest speed, 100 % its top.' },
+    { kind: 'try', head: 'Follow temperature', text: 'Press "Follow temperature".', target: 'ch-follow', setup: () => scene({ panel: true, chip: 80 }), wait: 'choose', when: d => d === 'follow', ok: 'It follows the Chip temperature. At or below Start (first 65°) the fans run at their lowest, at Full (first 95°) at their top, and in between it is even.' },
+    { kind: 'check', head: 'Quick check', text: 'Start is 65°, Full is 95°, the chip is 80°. Where are the fans?', answers: ['Halfway between lowest and top', 'At the lowest speed', 'At the top speed'], right: 0, ok: 'Right: 80° is halfway between 65° and 95°.', setup: () => scene({ panel: true, chip: 80, choice: 'follow' }) },
+    { kind: 'try', head: 'For how long', text: 'Cool is on. In the line "For", press "10 min".', target: 'for-10', setup: () => scene({ panel: true, choice: 'cool', chip: 70 }), wait: 'lasting', when: d => d === '10', ok: 'The status line counts down: "You decide: Cool · 10 min left". When the time is up the Mac gets the fans back. The line also has 30 min, 1 hour and Until I change, and works with every choice except Automatic.' },
+    { kind: 'look', head: 'The amber note', text: 'The first time you pick a choice other than Automatic, an amber note says "Setting the fans needs your OK once", with the button "Allow fan control…". The Mac asks for your Mac password in its own dialog. The app never sees it.', target: 'note', setup: () => scene({ panel: true, note: { text: 'Setting the fans needs your OK once' } }) },
+  ]},
+  { title: 'The right-click menu', icon: 'menu', steps: [
+    { kind: 'try', head: 'Right-click the mark', text: 'Right-click the fan mark, or hold the control key and click it.', hint: 'New in 0.7. No right button? The practice box has a button for it.', target: 'item', setup: () => scene({ practice: ['rclick'] }), wait: 'menu-open', ok: 'A short menu: "Automatic", "Cool for 10 min", "Graphs…" and "Settings…". The tick beside Automatic says the Mac decides.' },
+    { kind: 'try', head: 'Cool for 10 min', text: 'Click "Cool for 10 min".', target: 'm-cool', setup: () => scene({ menu: true }), wait: 'choose', when: d => d === 'cool', ok: 'Cool starts for 10 minutes. The mark turns blue, and when the time is up the Mac gets the fans back.' },
+    { kind: 'try', head: 'Back to Automatic', text: 'Cool is on, so there is no tick beside Automatic. Click "Automatic".', target: 'm-auto', setup: () => scene({ menu: true, choice: 'cool', left: 10 }), wait: 'choose', when: d => d === 'automatic', ok: 'The Mac decides again. Open the menu once more and the tick is back beside Automatic.' },
+    { kind: 'try', head: 'Graphs…', text: 'Click "Graphs…".', target: 'm-graphs', setup: () => scene({ menu: true }), wait: 'graph-open', ok: 'The large graph opens in its own window, the same one the small graph in the panel opens.' },
+    { kind: 'try', head: 'Settings…', text: 'Click "Settings…".', target: 'm-settings', setup: () => scene({ menu: true }), wait: 'settings', ok: 'Settings opens, with its four tabs.' },
+  ]},
+  { title: 'The graphs', icon: 'graph', steps: [
+    { kind: 'look', head: 'The large graph', text: 'Pick 15 minutes, 1 hour or 6 hours. Coral lines are temperatures, the blue line is fan speed. This practice copy shows Chip, Battery and Fan speed; on your Mac a "Show" row also lets you add Graphics, Storage and Case. "Done" or Escape closes the window.', target: 'gwin', setup: () => scene({ graph: true }) },
+    { kind: 'try', head: 'Point at a graph', text: 'Move the pointer over any of the graphs.', target: 'plots', setup: () => scene({ graph: true }), wait: 'point', ok: 'A thin upright line marks that moment in every graph, with a small dot on each line. Each heading shows the figure at that moment, followed by "at 14:20" or similar.' },
+    { kind: 'look', head: 'Dashed lines and pale stretches', text: 'A dashed line marks every moment the choice changed. The Fan speed graph names the change. The pale blue stretch covers the time a choice other than Automatic was on. The pale teal stretch in the Battery graph is the time the battery was charging.', target: 'stretch', setup: () => scene({ graph: true }) },
+    { kind: 'look', head: 'Level lines', text: 'Thin flat lines, with their words at the right end. Amber "Heat notice 90°": from here the heat notice counts its 5 minutes; it moves with the level you pick in Settings and is gone when the notice is off. Red "Too hot 100°": the app’s own safety rule, the Mac gets the fans back.', target: 'line-amber', setup: () => scene({ graph: true }) },
+    { kind: 'look', head: 'Dotted grey: only reports', text: 'Two dotted grey lines have their grey words at the left end: "Reports: fans speed up at about 95°" and "Reports: chip slows itself at about 100° to 110°". They come from other owners of this kind of Mac, not from Apple, and may be wrong for yours. No line says when the Mac turns itself off: no figure exists.', target: 'line-report', setup: () => scene({ graph: true }) },
+    { kind: 'look', head: 'The usual band', text: 'The soft grey band is the usual range on this Mac: it holds the middle 80 % of the readings kept. The heading says it too, "usual here 50° to 86°". A green line appears once the app has seen the Mac itself take the fans to full in Automatic; until then the heading says "not seen yet".', target: 'band', setup: () => scene({ graph: true }) },
+    { kind: 'try', head: 'A gap says why', text: 'The Mac slept for a while, so the line has a gap with the grey word "asleep" ("not running" when the app was quit or the Mac restarted). Move the pointer into the gap.', target: 'gap', setup: () => scene({ graph: true }), wait: 'point', when: d => d === 'gap', ok: 'The heading says "asleep at …" instead of a figure.' },
+    { kind: 'try', head: 'The amber dot', text: 'A small amber dot marks where a notice was sent. Point at the dot in the Chip graph.', hint: 'New in 0.7. A dot also appears where a fan fell short. There is one in the Battery graph too.', target: 'dot-chip', setup: () => scene({ graph: true }), wait: 'point', when: d => d === 'dot', ok: 'The heading now shows the notice’s own words, here with the app that was working hardest.' },
+    { kind: 'try', head: 'Another way in: the AMS Deck', text: 'AMS Deck Mate now has a key "Fans 1,650" ("Fans off" when stopped) besides "Chip 69°". Press either key.', hint: 'New in 0.7. The Deck is practice here.', target: 'deck-fans', setup: () => scene({ deck: true, choice: 'cool', chip: 69, coolPct: 30 }), wait: 'graph-open', when: d => d === 'deck', ok: 'Either key opens Fan Menu’s graphs.' },
+    { kind: 'check', head: 'Quick check', text: 'What does a small amber dot in a graph mean?', answers: ['A notice was sent at that moment', 'The fans stopped there', 'You changed the choice there'], right: 0, ok: 'Right. A changed choice is a dashed line, and a pale stretch is a choice that was on.', setup: () => scene({ graph: true }) },
+  ]},
+  { title: 'Rules by themselves', icon: 'bell', steps: [
+    { kind: 'look', head: 'One section: By itself', text: 'Heat notice, Battery heat notice, A word when a timed choice ends, Quiet during calls, On battery: the Mac decides, Choice back after sleep and Quiet hours. Every one is a switch in Settings.', target: 'sec-byitself', setup: () => scene(SETTINGS_ON) },
+    { kind: 'try', head: 'The heat notice', text: 'The Mac decides. In the practice box, press "The chip stays at 90° for 5 minutes".', target: 'p-heat', setup: () => scene({ panel: true, practice: ['heat'] }), wait: 'heat', ok: 'A notification names the app working hardest (new in 0.7). It comes only while the Mac decides, at most once every 30 minutes, and has the button "Switch to Cool".' },
+    { kind: 'try', head: 'The battery heat notice', text: 'In the practice box, press "The battery stays above 35° for 10 minutes".', target: 'p-battery', setup: () => scene({ panel: true, practice: ['battery'] }), wait: 'battery', ok: 'At most once an hour. 35° is also the amber line in the Battery graph.' },
+    { kind: 'try', head: 'Switch on Quiet during calls', text: 'In Settings, switch on "Quiet during calls".', target: 'sw-calls', setup: () => scene(SETTINGS_ON), wait: 'sw', when: d => d.k === 'calls' && d.on, ok: 'It is off at first. Any app that listens counts, not only calls.' },
+    { kind: 'try', head: 'A call starts', text: 'In the practice box, press "A call starts".', target: 'p-call', setup: () => scene({ panel: true, practice: ['call'], sw: { ...SW0, calls: true } }), wait: 'call-start', ok: 'The status line says "You decide: Quiet (during a call)". Your own tap during the call wins.' },
+    { kind: 'try', head: 'The call ends', text: 'Press "The call ends".', target: 'p-call', setup: () => scene({ panel: true, practice: ['call'], sw: { ...SW0, calls: true }, choice: 'quiet', reason: 'during a call', call: true, before: 'automatic' }), wait: 'call-end', ok: 'The choice you had before comes back. That includes Automatic.' },
+    { kind: 'try', head: 'On battery', text: 'Cool is on. Press "Pull the power cable", then "Put the power cable back".', target: 'p-cable', setup: () => scene({ panel: true, practice: ['cable'], choice: 'cool', chip: 70 }), wait: 'cable-back', ok: 'While the cable was out the status line said "The Mac decides (on battery)". With the cable back in, Cool came back.' },
+    { kind: 'look', head: 'Sleep and quiet hours', text: '"Choice back after sleep": sleep always hands the fans to the Mac; with this on your choice comes back about 5 seconds after the Mac wakes. "Quiet hours": between the two times (22:00 to 07:00 at first) Quiet comes on by itself, and your own tap during the hours wins until they are over.', target: 'sw-hours', setup: () => scene(SETTINGS_ON) },
+    { kind: 'try', head: 'A word when a timed choice ends', text: 'The switch is on and Cool has 10 minutes. Press "The 10 minutes are up".', target: 'p-timeup', setup: () => scene({ panel: true, practice: ['timeup'], choice: 'cool', left: 10, chip: 70, sw: { ...SW0, timed: true } }), wait: 'time-up', when: d => d === true, ok: 'A notification says the choice is over and how the chip went. A choice shorter than 2 minutes says only that it is over.' },
+    { kind: 'check', head: 'Quick check', text: 'Quiet hours are on and you tap Cool during them. What wins?', answers: ['Your tap, until the hours are over', 'The quiet hours, always', 'Nothing: the Mac decides'], right: 0, ok: 'Right. You decide. If the Mac gets too hot, it gets the fans anyway.', setup: () => scene({ panel: true, sw: { ...SW0, hours: true } }) },
+  ]},
+  { title: 'Fan check-up', icon: 'pulse', steps: [
+    { kind: 'look', head: 'A section: Fan check-up', text: 'New in 0.7, in Settings. The button "Check the fans" runs each fan to its top for about 10 seconds, then tells you how it went. The fans go back to what they did before.', target: 'sec-checkup', setup: () => scene({ ...SETTINGS_ON, choice: 'quiet', chip: 68 }) },
+    { kind: 'try', head: 'Check the fans', text: 'Press "Check the fans".', hint: 'In this copy the check takes about 3 seconds.', target: 'checkup-btn', setup: () => scene({ ...SETTINGS_ON, choice: 'quiet', chip: 68 }), wait: 'checkup-done', ok: 'A line such as "Both fans fine · Left 5,310 of 5,348 · Right 5,750 of 5,776". Each fan’s own top is the mark.' },
+    { kind: 'check', head: 'Quick check', text: 'A fan stays well below the speed the app asked for, for 30 seconds. What happens?', answers: ['A notice comes by itself', 'Nothing until you run the check-up', 'The fans go to Full'], right: 0, ok: 'Right (new in 0.7). The graph also gets an amber dot there.', setup: () => scene({ ...SETTINGS_ON, cu: 'done' }) },
+    { kind: 'try', head: 'What happened', text: 'Click the tab "What happened".', target: 'page-happened', setup: () => scene(SETTINGS_ON), wait: 'tab', when: d => d === 'happened', ok: 'First "The last 7 days": Hottest, At 90° or more, Fans turning and A choice of yours on. Under it the last 20 things the app did, newest first. A choice that ended after 2 minutes or more gets a line such as "Cool for 10 min: chip 78° down to 61°".' },
+  ]},
+];
+
+/* ---------- Tour engine (reusable) ---------- */
+let ci = 0, si = 0, solved = false, targetOff = false;
+const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } };
+let doneChapters = new Set(JSON.parse(store.get('fanmenu-done') || '[]'));
+
+function emit(name, data) {
+  const st = LESSONS[ci]?.steps[si]; if (!st || solved || st.kind !== 'try') return;
+  if (st.on && st.on[name]) { markTarget(st.on[name]); return; }
+  if ((st.wait === name || st.alt === name) && (!st.when || st.when(data))) succeed(st.ok);
+}
+function succeed(msg) {
+  solved = true; targetOff = true; const fb = document.getElementById('fb'); if (fb) { fb.textContent = '✓ ' + msg; fb.className = 'feedback'; }
+  const nx = document.getElementById('next'); if (nx) { nx.disabled = false; nx.focus({ preventScroll: true }); }
+  markTarget();
+}
+let curTarget = null;
+function markTarget(t) {
+  if (t !== undefined) curTarget = t;
+  document.querySelectorAll('.target').forEach(e => e.classList.remove('target'));
+  if (!curTarget || targetOff) return;
+  const q = n => document.querySelector(`#stage [data-t="${CSS.escape(n)}"]`);
+  // If the thing to click is out of sight (a window or the panel was closed), point at the way back to it.
+  const el = q(curTarget) || (S.settings ? q('done') : S.graph ? q('gdone') : S.panel ? q('gear') : q('item'));
+  if (el) {
+    el.classList.add('target');
+    const pane = el.closest('.fm-pane');
+    if (pane && pane !== el) { let top = 0, n = el; while (n && n !== pane) { top += n.offsetTop; n = n.offsetParent; } const bot = top + el.offsetHeight; if (top < pane.scrollTop || bot > pane.scrollTop + pane.clientHeight) pane.scrollTop = Math.max(0, top - 40); }
+  }
+}
+function renderRail() {
+  const total = LESSONS.reduce((n, l) => n + l.steps.length, 0);
+  const before = LESSONS.slice(0, ci).reduce((n, l) => n + l.steps.length, 0) + si;
+  document.getElementById('rail').innerHTML = `<div class="brand">${tile(40)}<div><h1>Fan Menu Tour</h1><small>Learn the app in about 12 minutes</small></div></div>
+    ${LESSONS.map((l, i) => `<button class="chap ${i === ci ? 'cur' : ''} ${doneChapters.has(i) ? 'done' : ''}" data-ch="${i}">${icon(l.icon)}<span>${l.title}</span><span class="n">${doneChapters.has(i) ? '✓' : l.steps.length + ' steps'}</span></button>`).join('')}
+    <button class="chap ${ci === LESSONS.length ? 'cur' : ''}" data-ch="${LESSONS.length}">${icon('trophy')}<span>On your Mac</span></button>
+    <div class="bar"><i style="width:${Math.round(100 * Math.min(before, total) / total)}%"></i></div>
+    <p class="railnote">Everything here is a practice copy. Nothing changes on your Mac.</p>`;
+}
+document.getElementById('rail').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (b) goChapter(+b.dataset.ch); });
+
+function goChapter(i) {
+  ci = i; si = 0; clearTimers(); S = START();
+  const L = LESSONS[i]; if (L && L.setup) L.setup();   // bring the pretend Mac to where that chapter starts
+  renderStep();
+}
+
+function renderStep() {
+  renderRail();
+  const coach = document.getElementById('coach'), fin = document.getElementById('finish');
+  if (ci >= LESSONS.length) { renderFinish(); coach.hidden = true; return; }
+  coach.hidden = false; fin.hidden = true;
+  const L = LESSONS[ci], st = L.steps[si];
+  solved = st.kind === 'look'; targetOff = false;
+  if (st.setup) st.setup();
+  S.toast = '';
+  const kindName = { look: 'Look', try: 'Try it', check: 'Check' }[st.kind];
+  coach.innerHTML = `<div class="eyebrow">${icon(L.icon)} ${esc(L.title)} <span class="kind">· ${kindName} · step ${si + 1} of ${L.steps.length}</span></div>
+    <div><h2>${esc(st.head)}</h2><p>${esc(st.text)}</p>${st.hint ? `<p style="color:var(--muted);font-size:13px">${esc(st.hint)}</p>` : ''}</div>
+    <div class="btns">${ci + si > 0 ? '<button class="btn ghost" id="back">Back</button>' : ''}<button class="btn main-b" id="next" ${solved ? '' : 'disabled'}>${si === L.steps.length - 1 ? 'Finish chapter' : 'Next'}</button></div>
+    ${st.kind === 'check' ? `<div class="answers">${st.answers.map((a, i) => `<button class="ans" data-a="${i}">${esc(a)}</button>`).join('')}</div>` : ''}
+    <p class="feedback" id="fb"></p>`;
+  curTarget = st.target || null;
+  renderStage();
+  if (st.kind === 'check') coach.querySelectorAll('.ans').forEach(b => b.onclick = () => {
+    const fb = document.getElementById('fb');
+    if (+b.dataset.a === st.right) { coach.querySelectorAll('.ans').forEach(x => x.disabled = true); b.classList.add('right'); succeed(st.ok); }
+    else { b.classList.add('wrong'); fb.textContent = 'Not quite. Try another answer.'; fb.className = 'feedback no'; }
+  });
+  document.getElementById('next').onclick = next;
+  const bk = document.getElementById('back'); if (bk) bk.onclick = back;
+}
+function next() {
+  const L = LESSONS[ci];
+  if (si < L.steps.length - 1) { si++; renderStep(); return; }
+  doneChapters.add(ci); store.set('fanmenu-done', JSON.stringify([...doneChapters]));
+  goChapter(ci + 1);
+}
+function back() { if (si > 0) { si--; renderStep(); } else if (ci > 0) { goChapter(ci - 1); } }
+
+function renderFinish() {
+  const fin = document.getElementById('finish'); fin.hidden = false;
+  clearTimers(); S = START(); curTarget = null; renderStage();
+  const items = ['Hover over the fan mark in your menu bar and read who decides and the figures.',
+    'Click the mark, press "Cool", watch the mark turn blue, then press "Automatic" again.',
+    'Right-click (or control-click) the mark and look for the tick beside "Automatic".',
+    'Open the large graph ("Graphs…") and move the pointer over a line. Look for small amber dots.',
+    'In Settings, press "Check the fans" under "Fan check-up" and read the line when the fans are done (about 10 seconds; they get loud).',
+    'If you use an AMS Deck: look for the keys "Chip" and "Fans" and press one.',
+    'Look at the switches under "By itself" and decide which ones you want.'];
+  let ticks = JSON.parse(store.get('fanmenu-real') || '[]');
+  fin.innerHTML = `<h3>Now try it on your real Mac</h3>${items.map((t, i) => `<label><input type="checkbox" id="real-${i}" ${ticks.includes(i) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn main-b" id="again">Start the tour again</button></div>`;
+  fin.querySelectorAll('input').forEach((c, i) => c.onchange = () => { ticks = ticks.filter(x => x !== i); if (c.checked) ticks.push(i); store.set('fanmenu-real', JSON.stringify(ticks)); });
+  document.getElementById('again').onclick = () => goChapter(0);
+}
+
+/* Fit the 960×560 pretend Mac into its box */
+function fit() { const box = document.getElementById('stagebox'); document.getElementById('stage').style.transform = `scale(${box.clientWidth / 960})`; }
+new ResizeObserver(fit).observe(document.getElementById('stagebox'));
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName !== 'INPUT') { const n = document.getElementById('next'); if (n && !n.disabled && document.activeElement !== n) n.click(); } });
+goChapter(0); fit();
+</script>

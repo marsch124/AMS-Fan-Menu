@@ -328,7 +328,9 @@ The notification `com.schabbauer.AMSFanMenu.openGraph` opens the large graph win
 
 ### Proven / not proven (0.7)
 - Proven: the rule tests (59), among them `BusiestApp` (helpers summed, kernel_task skipped, 20 % floor), `FanCheck` (90 % rule, words), `FanShort` (80 %, 30 seconds, 6 hours) and the notice marks in the history.
-- Seen on the real Mac: (to be filled)
+- Seen on the real Mac (25 Nov 2026, 18:57–19:00): the check-up on the real fans twice (both at their top within about 5 s: "Both fans fine · Left 5,355 of 5,348 · Right 5,809 of 5,776" and "Left 5,372 of 5,348 · Right 5,809 of 5,776"; afterwards the Mac had the fans again, 1,516 / 1,635); the real Settings window with the result line (by night); the real right-click menu with the tick beside Automatic (by night, through the check hook `showRightMenu`, which closes it after 4 s); `--busiest` on the real Mac; Deck Mate 0.22's "Fans off" key on a copy of his keys while the fans really stood still at chip 50°, and its press opening the Graph window.
+- Not proven: a heat notice, too-hot notice or fan-short notice for real (none was due); the amber dots on real readings (seen only in `--snapshots` sample pictures); a real right-click with the mouse; the screens by day.
+- Check hooks added during the release check: distributed notification `com.schabbauer.AMSFanMenu.showRightMenu` (the right-click menu for 4 s) and `openSettings` with the object `checkUp` (Settings scrolled to the Fan check-up).
 - Helper unchanged (version 2): no new password.
 
 ## What is proven and what is not yet

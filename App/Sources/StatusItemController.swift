@@ -125,6 +125,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
     }
 
+    /// For checks: the right-click menu, closed again by itself after four seconds.
+    func showMenuForCheck() {
+        let menu = makeMenu()
+        let close = Timer(timeInterval: 4, repeats: false) { _ in menu.cancelTracking() }
+        RunLoop.main.add(close, forMode: .common)
+        item.menu = menu
+        item.button?.performClick(nil)
+        item.menu = nil
+    }
+
     /// Titles of the right-click menu, in order (a separator between the second and the third).
     static let rightMenuTitles = ["Automatic", "Cool for 10 min", "Graphs\u{2026}", "Settings\u{2026}"]
 

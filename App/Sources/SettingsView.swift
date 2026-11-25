@@ -48,6 +48,8 @@ struct SettingsView: View {
     var startTab: Tab = .settings
     /// For checks: open with the page scrolled to its end.
     var atEnd = false
+    /// For checks: a part of the page to scroll to ("checkUp").
+    var scrollTo: String? = nil
     @State private var picked: Tab?
     @State private var openAtLogin = UserDefaults.standard.bool(forKey: LoginItem.wantedKey)
     @Environment(\.colorScheme) private var scheme
@@ -71,8 +73,11 @@ struct SettingsView: View {
                             Color.clear.frame(height: 1).id("pageEnd")
                         }
                         .onAppear {
-                            guard atEnd else { return }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo("pageEnd", anchor: .bottom) }
+                            if atEnd {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo("pageEnd", anchor: .bottom) }
+                            } else if let scrollTo {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo(scrollTo, anchor: .top) }
+                            }
                         }
                     }
                 } else {
@@ -210,7 +215,7 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Fan check-up").font(.headline).foregroundStyle(Palette.fan(scheme))
+                Text("Fan check-up").font(.headline).foregroundStyle(Palette.fan(scheme)).id("checkUp")
                 HStack(spacing: 8) {
                     Button(model.checkUpUntil == nil ? "Check the fans" : "Checking the fans…") { model.startCheckUp() }
                         .buttonStyle(.borderedProminent)

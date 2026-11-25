@@ -185,6 +185,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                            name: Notification.Name("com.schabbauer.AMSFanMenu.openSettings"), object: nil)
         center.addObserver(self, selector: #selector(chooseFromOutside(_:)), name: Self.chooseName, object: nil)
         // 0.7: lets a check from outside start the fan check-up in the running app.
+        center.addObserver(self, selector: #selector(showRightMenu),
+                           name: Notification.Name("com.schabbauer.AMSFanMenu.showRightMenu"), object: nil)
         center.addObserver(self, selector: #selector(checkFans),
                            name: Notification.Name("com.schabbauer.AMSFanMenu.checkFans"), object: nil)
         center.addObserver(self, selector: #selector(showGraph),
@@ -206,10 +208,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// A word with the wish picks the tab ("happened", "guide", "news") or the end of the Settings page ("end"), for checks.
     @objc private func showSettings(_ notification: Notification) {
         let word = notification.object as? String ?? ""
-        openSettings(tab: SettingsView.Tab(rawValue: word) ?? .settings, atEnd: word == "end")
+        openSettings(tab: SettingsView.Tab(rawValue: word) ?? .settings, atEnd: word == "end", scrollTo: word == "checkUp" ? word : nil)
     }
     @objc private func showGraph() { openGraph() }
     @objc private func checkFans() { model?.startCheckUp() }
+    /// For checks: the right-click menu for four seconds, so it can be photographed.
+    @objc private func showRightMenu() { status?.showMenuForCheck() }
     @objc private func pretendWake() { model?.pretendSleepAndWake() }
     @objc private func pretendClock(_ notification: Notification) { model?.pretend(clock: notification.object as? String ?? "real") }
     @objc private func pretendBatteryTemp(_ notification: Notification) {
@@ -247,12 +251,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         graphWindow?.orderFrontRegardless()
     }
 
-    private func openSettings(tab: SettingsView.Tab = .settings, atEnd: Bool = false) {
+    private func openSettings(tab: SettingsView.Tab = .settings, atEnd: Bool = false, scrollTo: String? = nil) {
         guard let model else { return }
         model.checkHelper()
         let content = NSHostingController(rootView: SettingsView(model: model, close: { [weak self] in
             self?.settingsWindow?.close()
-        }, startTab: tab, atEnd: atEnd))
+        }, startTab: tab, atEnd: atEnd, scrollTo: scrollTo))
         if let settingsWindow {
             settingsWindow.contentViewController = content
         } else {
