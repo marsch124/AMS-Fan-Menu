@@ -321,14 +321,14 @@ enum Snapshots {
                             pointAt: sample.historyNow - 20 * 60).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-point-\(tag).png"))
             // The whole Settings tab, however long, so every switch can be seen in a picture.
-            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .settings).frame(height: 900).background(back)
+            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .settings).frame(height: 1060).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-whole-\(tag).png"))
             for (tab, name) in [(SettingsView.Tab.settings, "settings"), (.happened, "settings-happened"), (.guide, "settings-guide"), (.news, "settings-news")] {
                 save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: tab).background(back).environment(\.colorScheme, scheme),
                      folder.appendingPathComponent("\(name)-\(tag).png"))
             }
             // The whole guide and the signs, however long, so every line can be read in a picture.
-            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 5600).background(back)
+            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 8000).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-guide-whole-\(tag).png"))
             let dark = scheme == .dark
             for (name, decides) in [("mac-decides", false), ("you-decide", true)] {

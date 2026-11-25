@@ -212,7 +212,7 @@ struct SettingsView: View {
                 switchRow("Choice back after sleep", isOn: model.backAfterSleep, id: "backAfterSleepToggle",
                           words: "Sleep always hands the fans to the Mac. With this on, your choice comes back about 5 seconds after the Mac wakes. Restart and quit still hand the fans to the Mac.") { model.setBackAfterSleep($0) }
                 switchRow("Quiet hours", isOn: model.quietHours, id: "quietHoursToggle",
-                          words: "Between the two times Quiet comes on by itself. Afterwards your choice from before comes back. Your own tap during the hours wins until the next evening.") { model.setQuietHours($0) }
+                          words: "Between the two times Quiet comes on by itself. Afterwards your choice from before comes back. Your own tap during the hours wins until they are over.") { model.setQuietHours($0) }
                 quietTimesRow
             }
 
@@ -445,6 +445,13 @@ struct SettingsView: View {
             .frame(width: 30, height: 18)
         case .greyBand:
             RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.primary.opacity(0.10)).frame(width: 28, height: 14)
+        case .teal: Circle().fill(Palette.power(scheme)).frame(width: 12, height: 12)
+        case .paleBlueStretch:
+            Rectangle().fill(Palette.pale(Palette.fan(scheme), scheme)).frame(width: 28, height: 16)
+        case .pointerLine:
+            Path { p in p.move(to: CGPoint(x: 15, y: 0)); p.addLine(to: CGPoint(x: 15, y: 18)) }
+                .stroke(Color.primary.opacity(0.45), lineWidth: 1)
+                .frame(width: 30, height: 18)
         }
     }
 

@@ -145,13 +145,13 @@ public struct Week: Codable, Equatable, Sendable {
 }
 
 extension Words {
-    /// "12 min", "5 h 10 min", "0 min"; under a minute (but not nothing) "under 1 min".
+    /// "12 min", "5 h 10 min", "5 h", "0 min"; under a minute (but not nothing) "under 1 min".
     public static func duration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds > 0 else { return "0 min" }
         if seconds < 60 { return "under 1 min" }
         let minutes = Int(seconds / 60)
         if minutes < 60 { return "\(minutes) min" }
-        return "\(minutes / 60) h \(minutes % 60) min"
+        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
     }
 
     /// "93° · Tue 14:20": the hottest moment, English short weekday, 24-hour clock.

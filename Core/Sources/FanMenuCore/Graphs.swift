@@ -30,12 +30,14 @@ public enum GraphPick: String, CaseIterable, Sendable {
         }
     }
 
-    /// How much of the room a graph takes next to the others (the chip graph carries the most level lines).
+    /// How much of the room a graph takes next to the others (the chip graph carries the most level lines;
+    /// storage and case carry none and move little, so they give room to the others when all six show).
     public var weight: Double {
         switch self {
         case .chip: return 172
         case .fans: return 118
-        default: return 128
+        case .storage, .palm: return 96
+        case .graphics, .battery: return 128
         }
     }
 }

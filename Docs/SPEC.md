@@ -1,4 +1,4 @@
-# AMS Fan Menu 0.4.1 (build 7, 25 Nov 2026) - Specification
+# AMS Fan Menu 0.5 (build 8, 25 Nov 2026) - Specification
 
 ## Purpose
 
@@ -31,6 +31,9 @@ From top to bottom:
    - Graphics is the average of Tg05, Tg0D, Tg0L, Tg0T.
    - Battery is the average of TB1T, TB2T.
    - Values outside 5 to 130 are ignored.
+   - From 0.5 a second line, "Storage 41° · Case 31°": Storage is the average of the sensors TH0a and TH0b (the built-in storage), Case the average of Ts0P and Ts1P (the case under the hands, left and right of the trackpad). Measured 25 Nov 2026: storage 31°, case 30°.
+   - From 0.5 a block "Power" (teal) with the line "Whole Mac 42 W": the sensor PSTR, what the whole Mac uses now, in watts. Measured 25 Nov 2026 at light work: about 42 W.
+   - Good to know: Apple documents none of these sensors (storage, case, power). The names are the ones fan tools commonly use, so the figures are the Mac's own but their meaning is by common use.
 4. Status line: "The Mac decides" or "You decide: Cool" (with the choice in use).
 5. The six choices.
 6. The line "For" (0.2): 10 min, 30 min, 1 hour, Until I change.
@@ -84,15 +87,31 @@ Before 0.3 Quiet always held both fans at the Quiet speed (at least the lowest r
 - The pick is remembered (default Until I change).
 - A time of its own (0.3.1): a wish from another app may carry its own time (see "For other apps"). It applies to that one choice only: the end is set from it instead of from the pick, the pick in UserDefaults is not touched, and the "For" line draws the time that runs in full colour (the one of the four with the same number of seconds; none when it is not one of them) until the choice ends or changes. Rule `OutsideAsk.shown`. A tap on a time in the line while such a time runs takes over at once, also on the pick already stored. The time of its own is dropped when the fans go back to the Mac, when a call switches to Quiet, and when a choice comes back after battery, a call or sleep (those follow the pick).
 
-## Graphs (0.2, 0.4, 0.4.1)
+## Graphs (0.2, 0.4, 0.4.1, 0.5)
 
 - Small graph at the bottom of the panel: the last 15 minutes. Coral line = chip temperature. Blue line = fan speed (average of both fans). Dashed line at every moment the choice changed. Unchanged in 0.4 (chip + fan speed, 15 minutes).
-- A tap opens the large graph in its own window, 560 x 734 (0.4.1; it was 560 x 690 in 0.4; the Chip graph is 172 points tall, the other temperature graphs 128, Fan speed 118) points (0.4; taller than before): 15 minutes, 1 hour or 6 hours. Four graphs, top to bottom: "Chip temperature", "Graphics temperature", "Battery temperature", "Fan speed" (the speed of each fan, Left and Right). "Done" or Escape closes it. Before 0.4 there were two graphs (chip, fan speed).
+- A tap opens the large graph in its own window, 560 x 768 (0.5; it was 560 x 734 in 0.4.1 and 560 x 690 in 0.4; the Chip graph is 172 points tall, the other temperature graphs 128, Fan speed 118) points (0.4; taller than before): 15 minutes, 1 hour or 6 hours. Six graphs from 0.5, top to bottom: "Chip temperature", "Graphics temperature", "Battery temperature", "Storage temperature", "Case temperature", "Fan speed" (the speed of each fan, Left and Right). At first four are shown (see "Choose which graphs show"). "Done" or Escape closes it. Before 0.4 there were two graphs (chip, fan speed); in 0.4 and 0.4.1 four.
 - Each temperature heading shows the figure now right beside its name, then a small grey mark (the same grey as the band) with the usual range, for example "Chip temperature 56°" and "usual here 41° to 78°". The band itself carries no word. While the green line has not been learned, the Chip heading ends with the grey words "fans at full in Automatic: not seen yet".
 - Words of a level line: at the right end, above the line, on a faint ground so the temperature line cannot hide them. A level line less than 13 points under the one above has its words below the line, and if that place is taken too, further in from the right.
 - The names of the changes (for example "Cool", "Automatic") at the dashed lines are drawn in the Fan speed graph (0.4; before, in the Chip graph), to leave room for the level words. Dashed lines stand upright and mean the moment the choice changed; level lines are solid and flat, so the two cannot be mixed up.
 - Scale (0.4, changed in 0.4.1): the Chip graph always reaches up to at least 120° (0.4: 110°; raised to make room for the rough lines), the Graphics graph up to at least 110°, the Battery graph up to at least 50° (the top is raised to fit higher readings), so the level lines are always in view. Before 0.4, the scale fitted the readings only.
-- One reading every 5 seconds, also while the panel is closed, of all three temperatures (chip, graphics, battery, from 0.4) and the fan speed. Six hours are kept. The readings are saved to a file on this Mac only (`history.json`) and survive quitting the app. Readings kept before 0.4 have only the chip (`graphics` and `battery` are missing), so those graphs start empty and fill from the update on. While the Mac sleeps or the app is not running there are no readings, and the line has a gap there.
+- One reading every 5 seconds, also while the panel is closed, of all three temperatures (chip, graphics, battery, from 0.4) and the fan speed. Six hours are kept. The readings are saved to a file on this Mac only (`history.json`) and survive quitting the app. Readings kept before 0.4 have only the chip (`graphics` and `battery` are missing); readings kept before 0.5 lack `storage`, `palm` (case) and `power`; so those graphs start empty and fill from the update on. From 0.5 each reading also carries `storage`, `palm` and `power`. While the Mac sleeps or the app is not running there are no readings, and the line has a gap there.
+
+### The figure where you point (0.5)
+
+- Moving the pointer over any graph draws a thin upright solid line at that moment in all graphs shown, with a small dot on each line (`Plot.nearest` finds the reading closest to the moment; `Plot.time` turns the pointer's place into a moment).
+- While pointing, each heading shows the figure at that moment instead of the figure now, followed by grey words "at 14:20" (the 15 minutes view adds seconds: "at 14:20:35"). The Fan speed heading reads "Left 1,580 · Right 1,640 at 14:20". Where there is a gap (the Mac slept or the app was not running) the figure is "–". With the pointer away everything is as before.
+- New sign: "Thin upright solid line that follows the pointer" (`SignKind.pointerLine`).
+
+### Colour while a choice is on (0.5)
+
+In the Fan speed graph a pale blue stretch covers every stretch of time in which a choice other than Automatic was on (`History.stretches`). The dashed lines and the names of the changes stay. New sign `SignKind.paleBlueStretch`.
+
+### Choose which graphs show (0.5)
+
+- A row under the time pick: the word "Show" and six small buttons: "Chip", "Graphics", "Battery", "Storage", "Case", "Fan speed". A shown graph's button is in full colour (coral for temperatures, blue for Fan speed), a hidden one is pale. A tap shows or hides the graph. The last shown graph cannot be hidden (rule `GraphPick`).
+- At first Chip, Graphics, Battery and Fan speed are shown; Storage and Case are hidden. The window keeps its size; the shown graphs share the room (fewer graphs = taller graphs). The pick is remembered (setting `shownGraphs`, `ShownGraphs`).
+- Storage and Case graphs: heading "Storage temperature" and "Case temperature", the grey "usual" band, no level lines, no rough lines.
 
 ### Level lines (0.4, rough lines 0.4.1)
 
@@ -100,25 +119,51 @@ Thin solid flat lines across a temperature graph, each with its words at the rig
 
 | Graph | Colour | Words | Where the figure comes from |
 |---|---|---|---|
-| Chip | amber | "Heat notice 90°" | The app's own heat notice: from 90° the notice counts its 5 minutes. |
+| Chip | amber | "Heat notice 90°" (0.5: the level picked, for example "Heat notice 85°"; not drawn while the Heat notice switch is off, before 0.5 always drawn) | The app's own heat notice: from that level the notice counts its 5 minutes. |
 | Chip | red | "Too hot 100°" | The app's own safety rule 1: hottest core at 100° for 15 seconds, not in Full, gives the fans back to the Mac. |
 | Chip | green | "Fans at full in Automatic · seen at N°" | Learned on this Mac (below). |
 | Battery | amber | "Apple's limit for the room 35°" | Apple Support, "Mac laptops operating temperature": use a Mac laptop where the surrounding air is 10 to 35 degrees. That is the room, not the battery itself, but it is the only figure Apple gives. |
 | Battery | red | "Charging may stop about 44°" | Charging stopped at 44 degrees on the battery sensor in one test by Howard Oakley (eclecticlight.co, Jan 2021) on an M1 MacBook Air. An independent measurement on another Apple laptop, not an Apple figure, hence "about". |
 | Chip | grey, dotted | "Reports: fans speed up at about 95°" (drawn at 95) | Rough, 0.4.1. See "Rough lines" below. |
 | Chip | grey, dotted | "Reports: chip slows itself at about 100° to 110°" (drawn at 105, the middle) | Rough, 0.4.1. See "Rough lines" below. |
-| Graphics | none | | Apple gives no figures and the app has no rule for it. |
+| Graphics, Storage, Case | none | | Apple gives no figures and the app has no rule for them. |
 
 - The learned green line: "full" = the average fan speed (both fans) is at or above 90 % of the average top speed. The app notes the chip temperature on the reading where that first becomes true while the MAC has the fans (Automatic, or Quiet while it lets the fans rest), not while the app holds a speed. Each new time replaces the old figure. It is kept in the setting `fullSeenAt` (degrees, absent until it has happened). Until then there is no green line, and grey words beside the Chip heading say "fans at full in Automatic: not seen yet".
-- The "usual" band, in all three temperature graphs: a soft grey band from the 10th to the 90th percentile of all readings kept (up to six hours), that is the range that holds the middle 80 %. It needs 360 readings (30 minutes at one every 5 seconds); before that there is no band and no "usual here" words.
-- Colours: amber = a temperature that needs your eye; red = too hot, from here something protects itself (the app gives the fans back, or the battery may stop charging), used nowhere else in the app; green = the Mac decides, here the Mac itself took the fans to full; coral = temperature, the line of all three graphs; the grey band = the usual range on this Mac.
+- The "usual" band, in all five temperature graphs (0.5): a soft grey band from the 10th to the 90th percentile of all readings kept (up to six hours), that is the range that holds the middle 80 %. It needs 360 readings (30 minutes at one every 5 seconds); before that there is no band and no "usual here" words.
+- Colours: amber = a temperature that needs your eye; red = too hot, from here something protects itself (the app gives the fans back, or the battery may stop charging), used nowhere else in the app; green = the Mac decides, here the Mac itself took the fans to full; coral = temperature, the line of all five temperature graphs; the grey band = the usual range on this Mac.
 - Rough lines (0.4.1): in the Chip graph only, `Level.Kind` has a third kind `report` (besides the true kinds); the figures are the constants 95 and 105 in `Levels`. They are drawn dotted and grey (`Color.secondary`, dash 1.5 / 3), and their words are grey and at the LEFT end of the line, so they cannot be mixed up with the true lines (solid, coloured, words at the right end). Words at the left have their own crowding rule, the same as on the right but mirrored: a line less than 13 points under the one above has its words below the line, and if that place is taken too, further in from the left. Source: forum posts by other owners of this kind of Mac (MacRumors forums); low confidence; not from Apple and not measured on this Mac, so they may be wrong for this Mac. For comparison, measured on this Mac on 25 Nov 2026: in Automatic the fans were still at about 1,590 turns a minute with the chip at 90° to 93°. When the green line has been learned on this Mac, it is the one to trust over the reports. Graphics and Battery have no rough lines. New sign in the guide: "Dotted grey line in a graph" (`SignKind.dottedLine`; Settings draws it in `swatch`).
 - Honest limits: Apple publishes no figure for the temperature at which the chip slows itself, at which the Mac takes the fans to full, or at which the Mac turns itself off. The rough lines are only owners' reports. There is still no line for "the Mac turns itself off": not even a report gives a figure. The line at the bottom of the window (0.4.1; before: "Apple gives no figure for when the Mac turns itself off, so there is no line for it.") now reads: "Dotted grey = owners' reports, not Apple · no figure for when the Mac turns itself off".
 - The helper did not change (version 2); no new password.
 
-## Heat notice (0.2)
+## Heat notice (0.2, level 0.5)
 
-While the Mac decides (Automatic): when the chip has been at 90 degrees or more for 5 minutes, a notification says so, with the button "Switch to Cool". At most once every 30 minutes. Switch in Settings "Heat notice", on by default.
+While the Mac decides (Automatic): when the chip has been at the level or more for 5 minutes, a notification says so, with the button "Switch to Cool". At most once every 30 minutes. Switch in Settings "Heat notice", on by default.
+
+From 0.5 a row "From" under the switch picks the level: 80°, 85°, 90° or 95° (default 90°, as before; `HeatNotice.levels`; setting `heatLevel`). The 5 minutes count from that level, and the amber line in the Chip graph moves with it ("Heat notice 85°"). With the switch off there is no amber line in the Chip graph.
+
+## Battery heat notice (0.5)
+
+- Switch in Settings, section "By itself": "Battery heat notice" (setting `batteryNotice`), on by default.
+- Rule `BatteryNotice`: limit 35°, patience 600 s, pause 3600 s. When the battery temperature has been above 35° for 10 minutes, a notification says "The battery has been above 35° for 10 minutes (now 37°)." At most once an hour. While the Mac decides it has the button "Switch to Cool".
+- What happened: "Battery heat notice: the battery was above 35° for 10 minutes". 35° is the amber line in the Battery graph.
+- Check hook: `--pretend-battery-temp 37|real`.
+
+## Quiet hours (0.5)
+
+- Switch in Settings, section "By itself": "Quiet hours" (setting `quietHours`), off by default, with two times, "From 22:00" and "To 07:00" (settings `quietFrom`, `quietTo`, minutes since midnight: 1320 and 420). The same time twice means no quiet hours.
+- Rule `QuietHours` (`inside`, `step`). Between the two times Quiet comes on by itself. Afterwards the choice from before comes back (or the Mac gets the fans again if it had them). Status line: "You decide: Quiet (quiet hours)".
+- What happened: "Quiet hours began: Quiet" and "Quiet hours ended: Cool again" or "Quiet hours ended: the Mac has the fans again".
+- Fine print: it lasts as long as the hours, whatever the "For" line says; the owner's own tap during the hours wins until they are over; if it gets too hot (100°, safety rule 1) the Mac gets the fans and the hours leave them alone for that night; on battery (with "On battery: the Mac decides" on) the Mac keeps the fans; during a call's Quiet nothing changes and the hours take over when the call ends; after sleep inside the hours Quiet comes on again; it needs the fan control helper to be in place.
+- Check hook: `--pretend-clock 22:30|real`.
+
+## Was the choice worth it (0.5)
+
+When a choice of the owner ends after 2 minutes or more (rule `Worth`, at least 120 s), What happened gets a line such as "Cool for 10 min: chip 78° down to 61°", "Quiet for 1 h 5 min: chip 60° up to 71°" or "Full for 2 h: chip stayed at 70°". It stands just before the line that says why the choice ended.
+
+## The last 7 days (0.5)
+
+- At the top of the What happened tab, a block "The last 7 days" with four rows: "Hottest 93° · Tue 14:20", "At 90° or more 12 min", "Fans turning 5 h 10 min", "A choice of yours on 1 h 5 min". Until seven days have figures, a grey line says "Counted since 25 Nov". Counting starts with 0.5.
+- Rules `Week` and `DayTally`. Kept on this Mac only, in the file `week.json` (today and the 7 days before).
 
 ## Quiet during calls (0.2)
 
@@ -135,7 +180,7 @@ Switch in Settings, on by default. When the power cable is pulled while a choice
 
 ## What happened (0.2)
 
-The fourth Settings tab lists the last 20 things the app did, newest first, each with its time, in plain words, for example "Cool for 10 minutes", "The time was up: the Mac has the fans again", "Too hot (101°): the Mac has the fans again", "A call began: Quiet", "On battery: the Mac has the fans again". Kept on this Mac only.
+The fourth Settings tab lists the last 20 things the app did, newest first, each with its time, in plain words, for example "Cool for 10 minutes", "The time was up: the Mac has the fans again", "Too hot (101°): the Mac has the fans again", "A call began: Quiet", "On battery: the Mac has the fans again". From 0.5 also the lines of the battery heat notice, quiet hours and "was the choice worth it", and the block "The last 7 days" above the list. Kept on this Mac only.
 
 ## Choice back after sleep (0.2)
 
@@ -159,14 +204,14 @@ Setting fans needs administrator rights, so a small helper tool runs in the back
 
 ## What is remembered
 
-Stored on the Mac (UserDefaults): the My speed percentage, Start, Full, the wish for Open at login, the time picked in the "For" line, the Quiet and Cool percentages, the switch `quietRest` (Quiet lets the fans stop, 0.3, default on), and the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep), and from 0.4 `fullSeenAt` (the chip temperature at which the Mac last took the fans to full in Automatic; absent until it has happened). Also on this Mac only: the history file `history.json` with the graph readings (six hours; from 0.4 each reading carries the chip, `graphics` and `battery` temperatures, the fan speeds and the choice) and the What happened list (last 20). The choice in use is never stored, so the app always starts on Automatic.
+Stored on the Mac (UserDefaults): the My speed percentage, Start, Full, the wish for Open at login, the time picked in the "For" line, the Quiet and Cool percentages, the switch `quietRest` (Quiet lets the fans stop, 0.3, default on), and the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep), and from 0.4 `fullSeenAt` (the chip temperature at which the Mac last took the fans to full in Automatic; absent until it has happened). From 0.5 also: `heatLevel` (80, 85, 90 or 95, default 90), `batteryNotice` (default on), `quietHours` (default off), `quietFrom` and `quietTo` (minutes since midnight, default 1320 and 420), `shownGraphs` (which graphs show). Also on this Mac only: the file `week.json` with the figures of the last 7 days (0.5), the history file `history.json` with the graph readings (six hours; from 0.4 each reading carries the chip, `graphics` and `battery` temperatures, the fan speeds and the choice; from 0.5 also `storage`, `palm` and `power`) and the What happened list (last 20). The choice in use is never stored, so the app always starts on Automatic.
 
 ## Settings window
 
 440 x 560 points, with four drawn tabs: Settings (green), What happened, How it works (blue), What's new (coral).
 
-- Settings: Open at login, "Your speeds" (Quiet and Cool, and from 0.3 the switch "Quiet lets the fans stop"), the four switches (Heat notice, Quiet during calls, On battery: the Mac decides, Choice back after sleep), the helper state with "Remove the helper...", the version, "Quit AMS Fan Menu", and "Done" (Escape closes the window).
-- What happened: the last 20 things the app did (see above).
+- Settings: Open at login, "Your speeds" (Quiet and Cool, and from 0.3 the switch "Quiet lets the fans stop"), and from 0.5 the section "By itself": Heat notice with its row "From" (80°, 85°, 90°, 95°), Battery heat notice, Quiet during calls, Quiet hours with "From" and "To" times, On battery: the Mac decides, Choice back after sleep, the helper state with "Remove the helper...", the version, "Quit AMS Fan Menu", and "Done" (Escape closes the window).
+- What happened: the block "The last 7 days" and the last 20 things the app did (see above).
 - Open at login uses the "keeper": a LaunchAgent, `com.schabbauer.AMSFanMenu.keeper`, that opens the app at login and after an unexpected stop, but not after Quit.
 - How it works: a guide to the whole app, including the section "Signs in this app" (every mark and colour with its meaning).
 - What's new: every version, newest first.
@@ -187,6 +232,8 @@ Only one copy of the app runs: the copy that started first stays.
   - `--try-speeds 3000,3000 --seconds 6`: asks the helper for these speeds once a second for that many seconds, prints each answer, gives the fans back, then quits.
   - `--open-at-login on|off|status`.
   - `--pretend-chip <degrees>|real` (0.3): makes the app use that chip temperature for the Quiet rest rule, or the real reading with `real`. For tests.
+  - `--pretend-clock 22:30|real` (0.5): makes the app use that time of day for quiet hours, or the real clock with `real`. For tests.
+  - `--pretend-battery-temp 37|real` (0.5): makes the app use that battery temperature for the battery heat notice, or the real reading with `real`. For tests.
   - `--pretend-wake`, `--pretend-battery on|off`, `--pretend-call on|off` (0.2): send a distributed notification to the running copy that acts as if the Mac woke, the power cable was pulled or put back, or a call began or ended. For tests.
   - Distributed notifications: `com.schabbauer.AMSFanMenu.togglePanel` and `com.schabbauer.AMSFanMenu.openSettings`.
 
@@ -222,6 +269,7 @@ Not proven yet:
 - Open at login across a real restart.
 - The too-hot hand-back.
 - The rough lines (0.4.1) are hearsay from forum posts and have not been checked against this Mac.
+- 0.5: see the release notes of the build.
 - The green line "Fans at full in Automatic" has never been seen for real: the Mac has not taken the fans to full since 0.4. Only its rule test has run.
 
 ## Version history
@@ -238,6 +286,8 @@ Not proven yet:
 - 0.4 (build 6, 25 Nov 2026): graphs for all three temperatures. History keeps chip, graphics and battery (six hours, every 5 seconds). The large graph window has four graphs (Chip, Graphics, Battery temperature, Fan speed), 560 x 690 points. Level lines: chip amber 90° and red 100°, battery amber 35° and red about 44°, a green chip line learned where the Mac itself takes the fans to full (setting `fullSeenAt`); a grey "usual" band (10th to 90th percentile, after 360 readings); scale tops 110° and 50°; choice names moved to the Fan speed graph; one line saying there is no line for when the Mac turns itself off. New signs: red line, grey band. The helper did not change (version 2), so no password is needed.
 
 - 0.4.1 (build 7, 25 Nov 2026): two rough lines in the Chip graph, dotted grey with grey words at the left end: "Reports: fans speed up at about 95°" (at 95) and "Reports: chip slows itself at about 100° to 110°" (at 105), from owners' forum posts, not Apple, not measured here; Chip scale now tops 120° (was 110°); new bottom line "Dotted grey = owners' reports, not Apple · no figure for when the Mac turns itself off"; new sign "Dotted grey line in a graph". Graphics and Battery unchanged. The helper did not change (version 2), so no password is needed.
+
+- 0.5 (build 8, 25 Nov 2026): ten things from the owner's list. Graphs: the figure where you point (upright line, dot per line, heading shows the figure at that moment, "–" at gaps); a pale blue stretch in the Fan speed graph while a choice was on; a "Show" row picks which of six graphs show (Storage and Case hidden at first, setting `shownGraphs`); the window is 560 x 768. Learning: "was the choice worth it" lines in What happened (`Worth`, at least 120 s); "The last 7 days" block (`Week`/`DayTally`, `week.json`); a "Power" block ("Whole Mac 42 W", sensor PSTR); a second temperature line "Storage 41° · Case 31°" (TH0a/TH0b, Ts0P/Ts1P) with a graph each. Rules that act by themselves: battery heat notice (`BatteryNotice`, setting `batteryNotice`); heat notice level 80° to 95° (`HeatNotice.levels`, `heatLevel`, no amber line with the switch off); quiet hours (`QuietHours`, `quietHours`, `quietFrom`, `quietTo`). New hooks `--pretend-clock`, `--pretend-battery-temp`. History readings carry `storage`, `palm`, `power`. New signs: Teal, pale blue stretch, pointer line. The helper did not change (version 2), so no password is needed.
 
 ## Icon files
 
