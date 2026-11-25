@@ -103,6 +103,17 @@ struct PanelView: View {
                 Text("Temperature").font(.caption.weight(.semibold)).foregroundStyle(Palette.heat(scheme))
                 line([("Chip", Words.degrees(model.chip)), ("Graphics", Words.degrees(model.graphics)), ("Battery", Words.degrees(model.battery))])
                     .font(.callout).monospacedDigit().accessibilityIdentifier("temperatures")
+                if model.storage != nil || model.palm != nil {
+                    line([("Storage", Words.degrees(model.storage)), ("Case", Words.degrees(model.palm))])
+                        .font(.callout).monospacedDigit().accessibilityIdentifier("temperaturesMore")
+                }
+            }
+            if model.power != nil {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Power").font(.caption.weight(.semibold)).foregroundStyle(Palette.power(scheme))
+                    line([("Whole Mac", Words.watts(model.power))])
+                        .font(.callout).monospacedDigit().accessibilityIdentifier("power")
+                }
             }
             Text(Words.status(model.choice, left: model.leftWords, reason: model.reason, resting: model.resting))
                 .font(.callout.weight(.semibold))
