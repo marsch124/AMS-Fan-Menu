@@ -197,6 +197,10 @@ final class AppModel: ObservableObject {
     private var pretendMinute: Int?
     /// The graphics temperature as just read; nil while that part sleeps (the graph then has a gap).
     private var graphicsReading: Double?
+    // 0.6
+    /// When the Mac went to sleep, until it wakes: the gap in the graphs then says "asleep".
+    private var sleptAt: Double?
+    static var nowFile: URL { supportFolder.appendingPathComponent("now.json") }
     /// For checks: pretend the battery has this temperature (for the battery heat notice only).
     private var pretendBatteryTemp: Double?
     /// Was the choice worth it: the chip when the choice in use began.
@@ -279,6 +283,8 @@ final class AppModel: ObservableObject {
         if let data = try? Data(contentsOf: Self.historyFile), var old = try? JSONDecoder().decode(History.self, from: data) {
             old.trim(now: wall)
             history = old.withoutFalseGraphics()
+            // 0.6: the gap since the last reading has a reason.
+            if let last = history.samples.last { history.pause(from: last.time, to: wall, why: Pause.notRunning) }
         }
         if let data = try? Data(contentsOf: Self.weekFile), let old = try? JSONDecoder().decode(Week.self, from: data) {
             week = old
@@ -373,6 +379,7 @@ final class AppModel: ObservableObject {
         week.add(time: time, chip: chip, fansTurning: fans.contains { ($0.speed ?? 0) > 0 },
                  appRuns: choice.appDecides && !resting, seconds: min(max(time - (lastWeekTime ?? time), 0), 15))
         lastWeekTime = time
+        writeNow(time)
         if now - lastHistorySave > 300 { saveHistory() }
     }
 
@@ -386,6 +393,19 @@ final class AppModel: ObservableObject {
         fullSeenAt = seen
         UserDefaults.standard.set(seen, forKey: Key.fullSeenAt)
         Diary.note("The Mac itself took the fans to full with the chip at \(Words.degrees(seen))")
+    }
+
+    /// 0.6: the figures of this reading in a small file, for other apps (AMS Deck Mate's temperature key).
+    /// Any figure may be missing; `time` says how fresh they are.
+    private func writeNow(_ time: Double) {
+        var figures: [String: Any] = ["time": time, "fans": fans.compactMap(\.speed), "version": AppInfo.version]
+        for (name, value) in [("chip", chip), ("hottest", hottest), ("graphics", graphicsReading), ("battery", battery),
+                              ("storage", storage), ("case", palm), ("power", power)] {
+            if let value, value.isFinite { figures[name] = (value * 10).rounded() / 10 }
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: figures, options: [.sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
+        try? data.write(to: Self.nowFile, options: .atomic)
     }
 
     private func saveWeek() {
@@ -428,7 +448,10 @@ final class AppModel: ObservableObject {
             return
         }
         if Lasting.isOver(endsAt: endsAt, now: wall) {
+            let over = Worth.overWords(title: choice.title,
+                                       change: Worth.change(seconds: wall - choiceSince, from: worthFrom, to: chip))
             handBack(telling: nil, why: "the time was up", story: "The time was up: the Mac has the fans again")
+            if timedWord { notify(over) }
             return
         }
         let left = Lasting.leftWords(endsAt: endsAt, now: wall)
@@ -876,7 +899,11 @@ final class AppModel: ObservableObject {
     }
 
     @objc private func willSleep() {
-        guard choice.appDecides else { return }
+        sleptAt = wall
+        guard choice.appDecides else {
+            saveHistory()
+            return
+        }
         let keep = callActive ? callBefore : hoursActive ? hoursBefore : choice
         beforeSleep = backAfterSleep && keep.appDecides ? keep : nil
         // With "Choice back after sleep" on, the choice returns by itself, so there is nothing to tell.
@@ -887,6 +914,10 @@ final class AppModel: ObservableObject {
 
     @objc private func didWake() {
         Diary.note("Woke from sleep; the Mac decides" + (beforeSleep.map { "; \($0.title) comes back in 5 s" } ?? ""))
+        if let sleptAt {
+            history.pause(from: sleptAt, to: wall, why: Pause.asleep)
+            self.sleptAt = nil
+        }
         read()
         checkHelper()
         // The Mac needs a moment after waking before it hands the fans over again.

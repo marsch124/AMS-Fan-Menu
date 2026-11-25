@@ -209,6 +209,15 @@ struct SettingsView: View {
                           words: "When the chip has been at \(Int(QuietRest.coolBelow))° or less for \(Int(QuietRest.coolFor)) seconds, Quiet gives the fans to the Mac, which stops them while it is cool. When the Mac runs them faster than your Quiet speed, the app takes them again and holds them there, for at least \(Int(QuietRest.holdAtLeast / 60)) minutes.") { model.setQuietRest($0) }
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Small graph").font(.headline).foregroundStyle(Palette.heat(scheme))
+                smallGraphRow
+                Text("The coral line in the small graph at the bottom of the panel. The blue line is always the fan speed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("By itself").font(.headline).foregroundStyle(Palette.mac(scheme))
                 switchRow("Heat notice", isOn: model.heatNotice, id: "heatNoticeToggle",
@@ -216,6 +225,8 @@ struct SettingsView: View {
                 heatLevelRow
                 switchRow("Battery heat notice", isOn: model.batteryNotice, id: "batteryNoticeToggle",
                           words: "A notification when the battery has been above 35° for 10 minutes. At most once an hour.") { model.setBatteryNotice($0) }
+                switchRow("A word when a timed choice ends", isOn: model.timedWord, id: "timedWordToggle",
+                          words: "A notification when a choice with a time ends, for example “Cool is over: chip 78° down to 61°. The Mac has the fans again.”") { model.setTimedWord($0) }
                 switchRow("Quiet during calls", isOn: model.quietInCalls, id: "quietInCallsToggle",
                           words: "When an app has used the microphone for \(Int(CallQuiet.startAfter)) seconds, the app switches to Quiet; \(Int(CallQuiet.endAfter)) seconds after the microphone is free, your choice from before comes back. Any app that listens counts, not only calls.") { model.setQuietInCalls($0) }
                 switchRow("On battery: the Mac decides", isOn: model.batteryRule, id: "batteryToggle",
@@ -309,6 +320,31 @@ struct SettingsView: View {
         }
         .disabled(!model.heatNotice)
         .opacity(model.heatNotice ? 1 : 0.4)
+    }
+
+    /// "Shows Chip Battery Case": which temperature the small graph in the panel draws.
+    private var smallGraphRow: some View {
+        HStack(spacing: 6) {
+            Text("Shows").font(.callout).foregroundStyle(.secondary)
+            ForEach(AppModel.smallGraphPicks, id: \.self) { sensor in
+                let on = model.smallGraph == sensor
+                let name = sensor == .palm ? "Case" : sensor == .battery ? "Battery" : "Chip"
+                Button { model.setSmallGraph(sensor) } label: {
+                    Text(name).font(.callout.weight(.medium))
+                        .foregroundStyle(on ? Color.white : Palette.heat(scheme))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(on ? Palette.heatFill(scheme) : Palette.pale(Palette.heat(scheme), scheme),
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("The small graph shows \(name)")
+                .accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityIdentifier("smallGraph-\(sensor.rawValue)")
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     /// "From 22:00 · To 07:00": two small time pickers, 24-hour.
