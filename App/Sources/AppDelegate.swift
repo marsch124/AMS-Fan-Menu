@@ -324,6 +324,14 @@ enum Snapshots {
             save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: first,
                             pointAt: sample.historyNow - 20 * 60).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-point-\(tag).png"))
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, shown: first,
+                            pointAt: sample.historyNow - 17 * 60).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-point-pause-\(tag).png"))
+            for (sensor, name) in [(Sensor.battery, "battery"), (.palm, "case")] {
+                save(SmallGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, sensor: sensor)
+                        .padding(10).frame(width: 300).background(back).environment(\.colorScheme, scheme),
+                     folder.appendingPathComponent("panel-small-\(name)-\(tag).png"))
+            }
             // The whole Settings tab, however long, so every switch can be seen in a picture.
             save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .settings).frame(height: 1200).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-whole-\(tag).png"))
