@@ -493,6 +493,8 @@ struct SettingsView: View {
         case .greyBand:
             RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.primary.opacity(0.10)).frame(width: 28, height: 14)
         case .teal: Circle().fill(Palette.power(scheme)).frame(width: 12, height: 12)
+        case .paleTealStretch:
+            Rectangle().fill(Palette.pale(Palette.power(scheme), scheme)).frame(width: 28, height: 16)
         case .paleBlueStretch:
             Rectangle().fill(Palette.pale(Palette.fan(scheme), scheme)).frame(width: 28, height: 16)
         case .pointerLine:

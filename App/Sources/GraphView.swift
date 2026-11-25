@@ -147,8 +147,14 @@ private struct PlotDrawing: View {
                 }
                 if titles {
                     ForEach(Array(visibleTitles(xs).enumerated()), id: \.offset) { _, item in
-                        Text(item.title).font(.caption2).foregroundStyle(.secondary).fixedSize()
-                            .offset(x: item.x + 3, y: 1)
+                        // Near the right edge the name stands left of its line, so it is never cut off.
+                        if item.x > size.width - 60 {
+                            Text(item.title).font(.caption2).foregroundStyle(.secondary).fixedSize()
+                                .frame(width: max(item.x - 3, 0), alignment: .trailing).offset(y: 1)
+                        } else {
+                            Text(item.title).font(.caption2).foregroundStyle(.secondary).fixedSize()
+                                .offset(x: item.x + 3, y: 1)
+                        }
                     }
                 }
                 // True figures have their words at the right end, rough ones from reports at the left end.

@@ -451,7 +451,10 @@ final class AppModel: ObservableObject {
             let over = Worth.overWords(title: choice.title,
                                        change: Worth.change(seconds: wall - choiceSince, from: worthFrom, to: chip))
             handBack(telling: nil, why: "the time was up", story: "The time was up: the Mac has the fans again")
-            if timedWord { notify(over) }
+            if timedWord {
+                notify(over)
+                Diary.note("Told: \(over)")
+            }
             return
         }
         let left = Lasting.leftWords(endsAt: endsAt, now: wall)
