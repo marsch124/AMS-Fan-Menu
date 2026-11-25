@@ -210,6 +210,28 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
+                Text("Fan check-up").font(.headline).foregroundStyle(Palette.fan(scheme))
+                HStack(spacing: 8) {
+                    Button(model.checkUpUntil == nil ? "Check the fans" : "Checking the fans…") { model.startCheckUp() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Palette.fanFill(scheme))
+                        .disabled(model.checkUpUntil != nil)
+                        .accessibilityIdentifier("checkFansButton")
+                    if model.checkUpUntil != nil { ProgressView().controlSize(.small) }
+                }
+                if let words = model.checkUpWords, let time = model.checkUpTime {
+                    Text("\(Words.clock(time, seconds: false)): \(words)")
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("checkFansResult")
+                }
+                Text("Each fan runs to its top for about \(Int(FanCheck.seconds)) seconds, then the fans go back to what they did before. A fan that gets to \(Int(FanCheck.fineShare * 100)) % of its top is fine. While the app runs the fans, a notification comes by itself when a fan stays well below the speed asked for, for \(Int(FanShort.patience)) seconds.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Small graph").font(.headline).foregroundStyle(Palette.heat(scheme))
                 smallGraphRow
                 Text("The coral line in the small graph at the bottom of the panel. The blue line is always the fan speed.")
@@ -221,7 +243,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("By itself").font(.headline).foregroundStyle(Palette.mac(scheme))
                 switchRow("Heat notice", isOn: model.heatNotice, id: "heatNoticeToggle",
-                          words: "While the Mac decides: a notification when the chip has been at \(Int(model.heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes, with the button “Switch to Cool”.") { model.setHeatNotice($0) }
+                          words: "While the Mac decides: a notification when the chip has been at \(Int(model.heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes, with the button “Switch to Cool”. It names the app working hardest at that moment.") { model.setHeatNotice($0) }
                 heatLevelRow
                 switchRow("Battery heat notice", isOn: model.batteryNotice, id: "batteryNoticeToggle",
                           words: "A notification when the battery has been above 35° for 10 minutes. At most once an hour.") { model.setBatteryNotice($0) }

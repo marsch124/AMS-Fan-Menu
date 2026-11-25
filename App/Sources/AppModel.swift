@@ -102,6 +102,10 @@ final class AppModel: ObservableObject {
     /// Quiet is on and the Mac has the fans, because it is cool.
     @Published private(set) var resting = false
     @Published private(set) var happened: [Happening] = []
+    /// 0.7: the fan check-up — running until this moment (nil = not running), and its last result.
+    @Published private(set) var checkUpUntil: Double?
+    @Published private(set) var checkUpWords: String?
+    @Published private(set) var checkUpTime: Double?
     /// The readings behind the graphs, and the time of the newest one.
     @Published private(set) var history = History()
     @Published private(set) var historyNow = Date().timeIntervalSince1970
@@ -197,6 +201,13 @@ final class AppModel: ObservableObject {
     private var pretendMinute: Int?
     /// The graphics temperature as just read; nil while that part sleeps (the graph then has a gap).
     private var graphicsReading: Double?
+    // 0.7
+    /// The highest speed each fan reached during the check-up.
+    private var checkUpBest: [Double] = []
+    private var checkUpLastSend = 0.0
+    /// A fan has been well below the speed asked for since this moment.
+    private var shortSince: Double?
+    private var lastShortNotice: Double?
     // 0.6
     /// When the Mac went to sleep, until it wakes: the gap in the graphs then says "asleep".
     private var sleptAt: Double?
@@ -358,7 +369,7 @@ final class AppModel: ObservableObject {
     /// for the graphs and the rules that act by themselves.
     private func retime() {
         guard live else { return }
-        let every = (panelOpen || choice.appDecides) ? 1.0 : History.every
+        let every = (panelOpen || choice.appDecides || checkUpUntil != nil) ? 1.0 : History.every
         guard timer == nil || every != timerEvery else { return }
         timer?.invalidate()
         let new = Timer(timeInterval: every, repeats: true) { [weak self] _ in self?.tick() }
@@ -433,6 +444,10 @@ final class AppModel: ObservableObject {
         checkCall()
         checkHours()
         checkBattery()
+        if checkUpUntil != nil {
+            checkUpStep()
+            return
+        }
         guard choice.appDecides else {
             checkWarmth()
             return
@@ -442,9 +457,11 @@ final class AppModel: ObservableObject {
             let degrees = Words.degrees(hottest)
             if callActive { callSpent = true }
             if hoursActive { hoursSpent = true }
+            let hardest = BusiestApp.words(Self.busiestNow())
             handBack(telling: "Too hot (\(degrees)). The Mac has the fans again.", why: "too hot while \(choice.title) was on",
-                     story: "Too hot (\(degrees)): the Mac has the fans again")
-            notify("Too hot (\(degrees)). The Mac has the fans again.")
+                     story: "Too hot (\(degrees)): the Mac has the fans again" + (hardest.map { ". " + $0.dropLast() } ?? ""))
+            history.notice("Too hot (\(degrees)): the Mac has the fans again", sensor: .chip, at: wall)
+            notify("Too hot (\(degrees)). The Mac has the fans again." + (hardest.map { " " + $0 } ?? ""))
             return
         }
         if Lasting.isOver(endsAt: endsAt, now: wall) {
@@ -462,6 +479,7 @@ final class AppModel: ObservableObject {
         checkRest()
         // The Mac takes the fans back when it hears nothing, so the choice is repeated; Follow also moves with the heat.
         if !resting, now - lastSend >= DeadMan.repeatEvery { send() }
+        checkShort()
     }
 
     // MARK: Choosing
@@ -484,6 +502,7 @@ final class AppModel: ObservableObject {
     /// "For" line stays as it is.
     func choose(_ new: FanChoice, by cause: Cause = .you, forSeconds: Double? = nil) {
         guard live else { choice = new; return }
+        if checkUpUntil != nil { endCheckUp(stoppedBy: "a new choice") }
         let yours = cause == .you || cause == .outside
         if yours {
             // Your own tap wins: nothing is put back later behind your back.
@@ -555,6 +574,8 @@ final class AppModel: ObservableObject {
         guard choice.appDecides, !resting, let speeds = wantedSpeeds() else { return }
         let first = sent == nil
         let changed = sent != speeds
+        // A new ask: the fans get their own time to get there.
+        if changed { shortSince = nil }
         sent = speeds
         lastSend = now
         let asked = choice
@@ -615,6 +636,13 @@ final class AppModel: ObservableObject {
     /// Quitting: the fans go back to the Mac, and the app waits a moment for the helper's word.
     func quitting() {
         guard live else { return }
+        if checkUpUntil != nil {
+            checkUpUntil = nil
+            if !choice.appDecides {
+                let fine = client.giveBackAndWait()
+                Diary.note("Quit during the fan check-up; fans given back: \(fine ? "yes" : "the helper gives them back by itself")")
+            }
+        }
         if choice.appDecides {
             let fine = client.giveBackAndWait()
             Diary.note("Quit while \(choice.title) was on; fans given back: \(fine ? "yes" : "no word from the helper, it gives them back by itself within \(Int(DeadMan.seconds)) s")")
@@ -831,8 +859,11 @@ final class AppModel: ObservableObject {
         warmSince = HeatNotice.hotSince(chip: chip, level: heatLevel, now: now, since: warmSince)
         guard HeatNotice.due(enabled: heatNotice, appDecides: choice.appDecides, hotSince: warmSince, now: now, lastTold: lastHeatNotice) else { return }
         lastHeatNotice = now
-        let text = "The chip has been at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes."
-        tell("Heat notice: the chip was at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes")
+        let hardest = BusiestApp.words(Self.busiestNow())
+        let text = "The chip has been at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes." + (hardest.map { " " + $0 } ?? "")
+        tell("Heat notice: the chip was at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes" + (hardest.map { ". " + $0.dropLast() } ?? ""))
+        history.notice("Heat notice: chip \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) min" + (hardest.map { " · " + $0.dropLast() } ?? ""),
+                       sensor: .chip, at: wall)
         Diary.note("Heat notice sent (chip \(Words.degrees(chip)))")
         notify(text, category: Self.heatCategory)
     }
@@ -903,6 +934,7 @@ final class AppModel: ObservableObject {
 
     @objc private func willSleep() {
         sleptAt = wall
+        if checkUpUntil != nil { endCheckUp(stoppedBy: "the Mac went to sleep") }
         guard choice.appDecides else {
             saveHistory()
             return
@@ -998,6 +1030,7 @@ final class AppModel: ObservableObject {
         lastBatteryNotice = now
         let minutes = Int(BatteryNotice.patience / 60)
         tell("Battery heat notice: the battery was above \(Int(BatteryNotice.limit))° for \(minutes) minutes")
+        history.notice("Battery above \(Int(BatteryNotice.limit))° for \(minutes) min", sensor: .battery, at: wall)
         Diary.note("Battery heat notice sent (battery \(Words.degrees(battery)))")
         // "Switch to Cool" only makes sense while the Mac decides.
         notify("The battery has been above \(Int(BatteryNotice.limit))° for \(minutes) minutes (now \(Words.degrees(battery))).",
@@ -1153,6 +1186,104 @@ final class AppModel: ObservableObject {
         guard live, !askedForNotes else { return }
         askedForNotes = true
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    // MARK: 0.7 — the fan check-up, a fan falling short, the app working hardest
+
+    /// Each fan runs to its top for a few seconds; afterwards they do what they did before.
+    func startCheckUp() {
+        guard live, checkUpUntil == nil, !fans.isEmpty else { return }
+        guard helper == .ready else {
+            showHelperNote()
+            checkHelper()
+            return
+        }
+        checkUpBest = fans.map { $0.speed ?? 0 }
+        checkUpUntil = now + FanCheck.seconds
+        checkUpLastSend = 0
+        Diary.note("Fan check-up: asking every fan for its top")
+        retime()
+        checkUpStep()
+    }
+
+    private func checkUpStep() {
+        guard let until = checkUpUntil else { return }
+        for (index, fan) in fans.enumerated() where index < checkUpBest.count {
+            checkUpBest[index] = max(checkUpBest[index], fan.speed ?? 0)
+        }
+        guard now < until else {
+            endCheckUp(stoppedBy: nil)
+            return
+        }
+        // The helper gives the fans back after a silence, so the ask is repeated.
+        if now - checkUpLastSend >= DeadMan.repeatEvery {
+            checkUpLastSend = now
+            client.setSpeeds(fans.map(\.range.top)) { [weak self] fine, text in
+                guard let self, !fine, self.checkUpUntil != nil else { return }
+                self.endCheckUp(stoppedBy: "the helper said no (\(text))")
+            }
+        }
+    }
+
+    /// `stoppedBy`: why it ended early, nil when its time was up.
+    private func endCheckUp(stoppedBy: String?) {
+        guard checkUpUntil != nil else { return }
+        checkUpUntil = nil
+        let words: String
+        if let stoppedBy {
+            words = "The check-up stopped early: \(stoppedBy)"
+        } else {
+            words = FanCheck.words(names: fans.map(\.name), best: checkUpBest, tops: fans.map(\.range.top))
+        }
+        checkUpWords = words
+        checkUpTime = wall
+        tell("Fan check-up: \(words)")
+        Diary.note("Fan check-up: \(words)")
+        // Back to what the fans did before.
+        sent = nil
+        shortSince = nil
+        if choice.appDecides {
+            resting = false
+            coolSince = nil
+            send()
+        } else {
+            client.giveBack { fine, text in
+                if !fine { Diary.note("Giving the fans back after the check-up: \(text)") }
+            }
+        }
+        retime()
+    }
+
+    /// While the app runs the fans: one of them well below the speed asked for, for half a minute.
+    private func checkShort() {
+        guard !resting, let sent else {
+            shortSince = nil
+            return
+        }
+        let short = FanShort.short(asked: sent, actual: fans.map(\.speed))
+        shortSince = FanShort.shortSince(short: short, now: now, since: shortSince)
+        guard FanShort.due(shortSince: shortSince, now: now, lastTold: lastShortNotice), let index = short.first,
+              index < fans.count, index < sent.count else { return }
+        lastShortNotice = now
+        let fan = fans[index], actual = fan.speed ?? 0
+        tell(FanShort.mark(name: fan.name, actual: actual, asked: sent[index]))
+        history.notice(FanShort.mark(name: fan.name, actual: actual, asked: sent[index]), sensor: nil, at: wall)
+        Diary.note("Fan falling short: \(fan.name) at \(Words.turns(actual)), asked \(Words.turns(sent[index]))")
+        notify(FanShort.words(name: fan.name, actual: actual, asked: sent[index]))
+    }
+
+    /// The app working hardest right now (its helpers counted with it), or nil when none stands out.
+    static func busiestNow() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-Ao", "pcpu=,comm="]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return BusiestApp.busiest(psOutput: String(decoding: data, as: UTF8.self))?.name
     }
 
     private func notify(_ text: String, category: String? = nil) {

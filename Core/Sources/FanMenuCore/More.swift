@@ -55,9 +55,10 @@ public struct ChoiceMark: Codable, Equatable, Sendable {
 /// 0.7: a notice that was sent, shown as an amber dot in the graph of its sensor.
 public struct NoticeMark: Codable, Equatable, Sendable {
     public let time: Double
-    public let sensor: Sensor
+    /// nil = the Fan speed graph (a fan falling short).
+    public let sensor: Sensor?
     public let words: String
-    public init(time: Double, sensor: Sensor, words: String) {
+    public init(time: Double, sensor: Sensor?, words: String) {
         self.time = time
         self.sensor = sensor
         self.words = words
@@ -129,7 +130,7 @@ public struct History: Codable, Equatable, Sendable {
     public var notices: [NoticeMark] { noticeList ?? [] }
 
     /// Notes a notice that was sent, so the graphs can show an amber dot at its moment.
-    public mutating func notice(_ words: String, sensor: Sensor, at time: Double) {
+    public mutating func notice(_ words: String, sensor: Sensor?, at time: Double) {
         noticeList = notices + [NoticeMark(time: time, sensor: sensor, words: words)]
         trim(now: time)
     }
@@ -137,6 +138,11 @@ public struct History: Codable, Equatable, Sendable {
     /// The notices of one graph in the last `seconds`.
     public func notices(_ sensor: Sensor, last seconds: Double, now: Double) -> [NoticeMark] {
         notices.filter { $0.sensor == sensor && $0.time >= now - seconds && $0.time <= now }
+    }
+
+    /// The notices of the Fan speed graph (a fan falling short) in the last `seconds`.
+    public func fanNotices(last seconds: Double, now: Double) -> [NoticeMark] {
+        notices.filter { $0.sensor == nil && $0.time >= now - seconds && $0.time <= now }
     }
 
     /// The pauses that touch the last `seconds`.
