@@ -271,16 +271,22 @@ final class MoreTests: XCTestCase {
 
     /// 0.4: the level lines hold only true figures, and the scale always shows them.
     func testLevelLinesAndTheirScale() {
-        XCTAssertEqual(Levels.of(.chip).map(\.degrees), [90, 100])
-        XCTAssertEqual(Levels.of(.chip).map(\.words), ["Heat notice 90°", "Too hot 100°"])
-        XCTAssertEqual(Levels.of(.chip, fullSeenAt: 97.4).last?.words, "Fans at full in Automatic · seen at 97°")
-        XCTAssertEqual(Levels.of(.chip, fullSeenAt: 97.4).last?.kind, .macFull)
+        let sure = Levels.of(.chip).filter { $0.kind != .report }
+        XCTAssertEqual(sure.map(\.degrees), [90, 100])
+        XCTAssertEqual(sure.map(\.words), ["Heat notice 90°", "Too hot 100°"])
+        let seen = Levels.of(.chip, fullSeenAt: 97.4).first { $0.kind == .macFull }
+        XCTAssertEqual(seen?.words, "Fans at full in Automatic · seen at 97°")
+        // 0.4.1: two rough lines from other owners' reports, only in the chip graph, and they say what they are.
+        let rough = Levels.of(.chip).filter { $0.kind == .report }
+        XCTAssertEqual(rough.map(\.degrees), [95, 105])
+        XCTAssertEqual(rough.map(\.words), ["Reports: fans speed up at about 95°", "Reports: chip slows itself at about 100° to 110°"])
+        XCTAssertFalse(Levels.of(.battery).contains { $0.kind == .report })
         XCTAssertTrue(Levels.of(.graphics).isEmpty, "nobody gives a figure for the graphics")
         XCTAssertEqual(Levels.of(.battery).map(\.degrees), [35, 44])
-        XCTAssertEqual(Levels.scale(.chip, []), 80...110)
-        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 56), sample(5, chip: 78)]), 50...110)
-        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 112)]), 90...120, "a reading above the top lifts it")
-        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 95)]), 80...110, "never less than 30° tall")
+        XCTAssertEqual(Levels.scale(.chip, []), 90...120)
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 56), sample(5, chip: 78)]), 50...120)
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 123)]), 100...130, "a reading above the top lifts it")
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 95)]), 90...120, "never less than 30° tall")
         let cool = Sample(time: 0, chip: 60, speeds: [], graphics: 55, battery: 28)
         XCTAssertEqual(Levels.scale(.battery, [cool]), 20...50)
         XCTAssertEqual(Levels.scale(.graphics, [cool]), 50...110)

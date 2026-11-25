@@ -88,7 +88,8 @@ private struct PlotDrawing: View {
                     Path { p in
                         let y = height(shown[i].degrees, size)
                         p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
-                    }.stroke(levelColor(shown[i].kind, scheme).opacity(0.85), lineWidth: 1)
+                    }.stroke(levelColor(shown[i].kind, scheme).opacity(0.85),
+                             style: shown[i].kind == .report ? StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1.5, 3]) : StrokeStyle(lineWidth: 1))
                 }
                 Path { p in
                     for x in xs { p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: size.height)) }
@@ -103,15 +104,24 @@ private struct PlotDrawing: View {
                             .offset(x: item.x + 3, y: 1)
                     }
                 }
-                ForEach(Array(levelWords(shown, size).enumerated()), id: \.offset) { _, item in
-                    Text(item.level.words).font(.caption2.weight(.medium)).foregroundStyle(levelColor(item.level.kind, scheme))
-                        .padding(.horizontal, 3)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(Color(nsColor: .windowBackgroundColor).opacity(0.7)))
-                        .fixedSize().frame(width: max(size.width - 2 - item.inFromRight, 0), alignment: .trailing)
+                // True figures have their words at the right end, rough ones from reports at the left end.
+                ForEach(Array(levelWords(shown.filter { $0.kind != .report }, size).enumerated()), id: \.offset) { _, item in
+                    words(item.level)
+                        .frame(width: max(size.width - 2 - item.inFromEdge, 0), alignment: .trailing)
                         .offset(y: item.y)
+                }
+                ForEach(Array(levelWords(shown.filter { $0.kind == .report }, size).enumerated()), id: \.offset) { _, item in
+                    words(item.level).offset(x: 2 + item.inFromEdge, y: item.y)
                 }
             }
         }
+    }
+
+    private func words(_ level: Level) -> some View {
+        Text(level.words).font(.caption2.weight(.medium)).foregroundStyle(levelColor(level.kind, scheme))
+            .padding(.horizontal, 3)
+            .background(RoundedRectangle(cornerRadius: 3).fill(Color(nsColor: .windowBackgroundColor).opacity(0.7)))
+            .fixedSize()
     }
 
     /// Where a temperature sits, in points from the top of the drawing.
@@ -119,10 +129,11 @@ private struct PlotDrawing: View {
         size.height - inset - CGFloat(Plot.y(degrees, in: scale)) * (size.height - 2 * inset)
     }
 
-    /// The words of each level line, at the right end: above the line when there is room. A line closer than a
-    /// line of words to the one above has its words below it, and if those are taken too, further in from the right.
-    private func levelWords(_ shown: [Level], _ size: CGSize) -> [(level: Level, y: CGFloat, inFromRight: CGFloat)] {
-        var out: [(level: Level, y: CGFloat, inFromRight: CGFloat)] = []
+    /// The words of each level line at one end of the graph: above the line when there is room. A line closer
+    /// than a line of words to the one above has its words below it, and if those are taken too, further in
+    /// from that end.
+    private func levelWords(_ shown: [Level], _ size: CGSize) -> [(level: Level, y: CGFloat, inFromEdge: CGFloat)] {
+        var out: [(level: Level, y: CGFloat, inFromEdge: CGFloat)] = []
         var lastLine: CGFloat?
         var lastBelow = false
         var taken: CGFloat = 0
@@ -153,12 +164,13 @@ private struct PlotDrawing: View {
 }
 
 /// Amber = from here it needs your eye; red = too hot, something protects itself; green = the Mac itself
-/// took the fans to full here.
+/// took the fans to full here; grey (dotted) = a rough figure from other owners' reports.
 private func levelColor(_ kind: Level.Kind, _ scheme: ColorScheme) -> Color {
     switch kind {
     case .watch: return Palette.warn(scheme)
     case .tooHot: return Palette.danger(scheme)
     case .macFull: return Palette.mac(scheme)
+    case .report: return Color.secondary
     }
 }
 
@@ -259,9 +271,9 @@ struct LargeGraph: View {
             HStack(alignment: .bottom, spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Coral = temperature \u{00B7} blue = fan speed \u{00B7} dashed line = you changed the choice")
-                    Text("Apple gives no figure for when the Mac turns itself off, so there is no line for it.")
+                    Text("Dotted grey = owners' reports, not Apple \u{00B7} no figure for when the Mac turns itself off")
                 }
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 Button(action: close) {
                     Text("Done").font(.callout.weight(.semibold)).foregroundStyle(.white)
@@ -272,7 +284,7 @@ struct LargeGraph: View {
             }
         }
         .padding(14)
-        .frame(width: 560, height: 690, alignment: .topLeading)
+        .frame(width: 560, height: 734, alignment: .topLeading)
         .accessibilityIdentifier("largeGraph")
     }
 
@@ -328,7 +340,8 @@ struct LargeGraph: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
         }
-        .frame(height: 128)
+        // The chip graph carries the most level lines, so it is the tallest.
+        .frame(height: sensor == .chip ? 172 : 128)
         .accessibilityIdentifier("plot-\(sensor.rawValue)")
     }
 

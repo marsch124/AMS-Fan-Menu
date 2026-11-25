@@ -179,14 +179,21 @@ public enum Sensor: String, CaseIterable, Sendable {
     }
 
     /// The scale of this graph always reaches at least this high, so its level lines are in view.
-    public var scaleTop: Double { self == .battery ? 50 : 110 }
+    public var scaleTop: Double {
+        switch self {
+        case .chip: return 120
+        case .graphics: return 110
+        case .battery: return 50
+        }
+    }
 }
 
 /// A temperature that means something: a flat line across a graph, with its words.
 public struct Level: Equatable, Sendable {
     /// `watch` = from here it needs your eye (amber); `tooHot` = from here something protects itself (red);
-    /// `macFull` = here the Mac itself took the fans to full (green).
-    public enum Kind: String, Sendable { case watch, tooHot, macFull }
+    /// `macFull` = here the Mac itself took the fans to full (green); `report` = a rough figure from other
+    /// owners' reports, not from Apple and not measured on this Mac (dotted grey, words at the left).
+    public enum Kind: String, Sendable { case watch, tooHot, macFull, report }
     public let kind: Kind
     public let degrees: Double
     public let words: String
@@ -198,14 +205,19 @@ public struct Level: Equatable, Sendable {
     }
 }
 
-/// The level lines of each graph. Only figures that are true are here: the app's own rules, Apple's one
-/// published figure, one named measurement, and what this Mac itself was seen to do. Apple publishes no figure
-/// for where the chip slows itself or where the Mac turns itself off, so there is no line for those.
+/// The level lines of each graph. The solid ones are true figures: the app's own rules, Apple's one published
+/// figure, one named measurement, and what this Mac itself was seen to do. Apple publishes no figure for where
+/// the fans speed up or the chip slows itself; since 0.4.1 (his yes) those two are shown as rough lines from
+/// other owners' reports, marked as such. Nobody gives a figure for where the Mac turns itself off: no line.
 public enum Levels {
     /// Apple: use a Mac laptop where it is 10° to 35° (the room, not the battery itself).
     public static let appleRoomLimit = 35.0
     /// Charging stopped at 44° on the battery sensor in one test (Howard Oakley, 2021, an M1 MacBook Air).
     public static let chargingMayStop = 44.0
+    /// Other owners report (forums, not Apple): the Mac lets the chip get to about 95° before the fans speed up.
+    public static let reportFansSpeedUp = 95.0
+    /// Other owners report (forums, not Apple): the chip slows itself somewhere from 100° to 110°. Drawn in the middle.
+    public static let reportChipSlows = 105.0
 
     public static func of(_ sensor: Sensor, fullSeenAt: Double? = nil) -> [Level] {
         switch sensor {
@@ -218,6 +230,10 @@ public enum Levels {
                 out.append(Level(kind: .macFull, degrees: fullSeenAt,
                                  words: "Fans at full in Automatic \u{00B7} seen at \(Words.degrees(fullSeenAt))"))
             }
+            out.append(Level(kind: .report, degrees: reportFansSpeedUp,
+                             words: "Reports: fans speed up at about \(Words.degrees(reportFansSpeedUp))"))
+            out.append(Level(kind: .report, degrees: reportChipSlows,
+                             words: "Reports: chip slows itself at about 100\u{00B0} to 110\u{00B0}"))
             return out
         case .graphics:
             return []

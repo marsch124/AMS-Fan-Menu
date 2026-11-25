@@ -345,6 +345,13 @@ struct SettingsView: View {
             }
             .stroke(Palette.danger(scheme), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
             .frame(width: 30, height: 18)
+        case .dottedLine:
+            Path { path in
+                path.move(to: CGPoint(x: 2, y: 9))
+                path.addLine(to: CGPoint(x: 28, y: 9))
+            }
+            .stroke(Color.secondary, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [1.5, 3]))
+            .frame(width: 30, height: 18)
         case .greyBand:
             RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.primary.opacity(0.10)).frame(width: 28, height: 14)
         }
