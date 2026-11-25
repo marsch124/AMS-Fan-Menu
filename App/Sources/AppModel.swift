@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Who asked for a choice. Your own tap wins over every rule that acts by itself.
-    enum Cause { case you, outside, call, callEnd, power, wake }
+    enum Cause { case you, outside, call, callEnd, power, wake, hours, hoursEnd }
 
     @Published private(set) var choice: FanChoice = .automatic
     @Published private(set) var fans: [FanNow] = []
@@ -167,6 +167,24 @@ final class AppModel: ObservableObject {
     private var lastHistorySave = 0.0
     /// The fans were at full on the reading before (or the app ran them): nothing new to learn until they slow.
     private var wasFull = true
+    // 0.5
+    /// The battery heat notice
+    private var batteryWarmSince: Double?
+    private var lastBatteryNotice: Double?
+    /// Quiet hours: Quiet is on because of them; what was on before; and "leave the fans alone until these
+    /// hours are over" (your own tap, or too hot).
+    private var hoursActive = false
+    private var hoursBefore: FanChoice = .automatic
+    private var hoursSpent = false
+    /// For checks: pretend it is this time of day (minutes since midnight).
+    private var pretendMinute: Int?
+    /// For checks: pretend the battery has this temperature (for the battery heat notice only).
+    private var pretendBatteryTemp: Double?
+    /// Was the choice worth it: the chip when the choice in use began.
+    private var worthFrom: Double?
+    /// The week in figures
+    private var lastWeekTime: Double?
+    private static var weekFile: URL { supportFolder.appendingPathComponent("week.json") }
 
     private enum Key {
         static let percent = "mySpeedPercent", start = "followStart", full = "followFull"
@@ -239,6 +257,9 @@ final class AppModel: ObservableObject {
         if let data = try? Data(contentsOf: Self.historyFile), var old = try? JSONDecoder().decode(History.self, from: data) {
             old.trim(now: wall)
             history = old
+        }
+        if let data = try? Data(contentsOf: Self.weekFile), let old = try? JSONDecoder().decode(Week.self, from: data) {
+            week = old
         }
         wasOnBattery = Power.onBattery
         read()
@@ -324,6 +345,9 @@ final class AppModel: ObservableObject {
                                  graphics: graphics, battery: battery, storage: storage, palm: palm, power: power)) else { return }
         historyNow = time
         learnFull()
+        week.add(time: time, chip: chip, fansTurning: fans.contains { ($0.speed ?? 0) > 0 },
+                 appRuns: choice.appDecides && !resting, seconds: min(max(time - (lastWeekTime ?? time), 0), 15))
+        lastWeekTime = time
         if now - lastHistorySave > 300 { saveHistory() }
     }
 
@@ -341,6 +365,10 @@ final class AppModel: ObservableObject {
 
     private func saveHistory() {
         lastHistorySave = now
+        if let data = try? JSONEncoder().encode(week) {
+            try? FileManager.default.createDirectory(at: Self.supportFolder, withIntermediateDirectories: true)
+            try? data.write(to: Self.weekFile, options: .atomic)
+        }
         let copy = history
         let file = Self.historyFile
         DispatchQueue.global(qos: .utility).async {
@@ -355,6 +383,8 @@ final class AppModel: ObservableObject {
         coolSince = QuietRest.coolSince(chip: restChip, now: now, since: coolSince)
         checkPower()
         checkCall()
+        checkHours()
+        checkBattery()
         guard choice.appDecides else {
             checkWarmth()
             return
@@ -363,6 +393,7 @@ final class AppModel: ObservableObject {
         if HeatGuard.handsBack(choice: choice, hotSince: hotSince, now: now) {
             let degrees = Words.degrees(hottest)
             if callActive { callSpent = true }
+            if hoursActive { hoursSpent = true }
             handBack(telling: "Too hot (\(degrees)). The Mac has the fans again.", why: "too hot while \(choice.title) was on",
                      story: "Too hot (\(degrees)): the Mac has the fans again")
             notify("Too hot (\(degrees)). The Mac has the fans again.")
@@ -404,6 +435,9 @@ final class AppModel: ObservableObject {
             // Your own tap wins: nothing is put back later behind your back.
             if callActive { callSpent = true }
             callActive = false
+            // A tap during quiet hours ends them for this night.
+            if quietHours, QuietHours.inside(minute: minuteNow, from: quietFrom, to: quietTo) { hoursSpent = true }
+            hoursActive = false
             parked = nil
             beforeSleep = nil
         }
@@ -421,6 +455,7 @@ final class AppModel: ObservableObject {
             return
         }
         let before = choice
+        if before.appDecides, before != new { tellWorth(of: before) }
         choice = new
         waiting = nil
         hotSince = nil
@@ -428,10 +463,12 @@ final class AppModel: ObservableObject {
         resting = false
         heldSince = nil
         overSince = nil
-        reason = cause == .call ? "during a call" : nil
-        // Quiet during a call lasts as long as the call, not as long as the "For" line says.
-        ownSeconds = cause == .call ? nil : forSeconds
-        endsAt = cause == .call ? nil : (forSeconds.map { wall + $0 } ?? lasting.endsAt(from: wall))
+        reason = cause == .call ? "during a call" : cause == .hours ? "quiet hours" : nil
+        // Quiet during a call lasts as long as the call, and quiet hours as long as the hours, not as long
+        // as the "For" line says.
+        let byRule = cause == .call || cause == .hours
+        ownSeconds = byRule ? nil : forSeconds
+        endsAt = byRule ? nil : (forSeconds.map { wall + $0 } ?? lasting.endsAt(from: wall))
         leftWords = Lasting.leftWords(endsAt: endsAt, now: wall)
         if note?.kind == .told { note = nil }
         if before != new || yours {
@@ -454,6 +491,7 @@ final class AppModel: ObservableObject {
     /// The choice changed: a dashed line in the graphs, and word to other apps.
     private func changed(to new: FanChoice) {
         choiceSince = wall
+        worthFrom = new.appDecides ? chip : nil
         history.mark(new.title, at: choiceSince)
         historyNow = choiceSince
         writeState()
@@ -499,6 +537,7 @@ final class AppModel: ObservableObject {
         leftWords = nil
         reason = nil
         callActive = false
+        hoursActive = false
         resting = false
         heldSince = nil
         overSince = nil
@@ -507,6 +546,7 @@ final class AppModel: ObservableObject {
                 if !fine { Diary.note("Giving the fans back: \(text)") }
             }
             Diary.note("Automatic (\(why)); before: \(was.title)")
+            tellWorth(of: was)
             if let story { tell(story) }
             changed(to: .automatic)
         }
@@ -718,11 +758,11 @@ final class AppModel: ObservableObject {
 
     /// While the Mac decides: the chip at 90° or more for five minutes is worth a word.
     private func checkWarmth() {
-        warmSince = HeatNotice.hotSince(chip: chip, now: now, since: warmSince)
+        warmSince = HeatNotice.hotSince(chip: chip, level: heatLevel, now: now, since: warmSince)
         guard HeatNotice.due(enabled: heatNotice, appDecides: choice.appDecides, hotSince: warmSince, now: now, lastTold: lastHeatNotice) else { return }
         lastHeatNotice = now
-        let text = "The chip has been at \(Int(HeatNotice.limit))° or more for \(Int(HeatNotice.patience / 60)) minutes."
-        tell("Heat notice: the chip was at \(Int(HeatNotice.limit))° or more for \(Int(HeatNotice.patience / 60)) minutes")
+        let text = "The chip has been at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes."
+        tell("Heat notice: the chip was at \(Int(heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes")
         Diary.note("Heat notice sent (chip \(Words.degrees(chip)))")
         notify(text, category: Self.heatCategory)
     }
@@ -774,7 +814,7 @@ final class AppModel: ObservableObject {
             break
         case .handBack:
             // A call's Quiet is not worth putting back; what you had before the call is.
-            let keep = callActive ? callBefore : choice
+            let keep = callActive ? callBefore : hoursActive ? hoursBefore : choice
             handBack(telling: nil, why: "on battery", story: "On battery: the Mac has the fans again")
             if keep.appDecides {
                 parked = keep
@@ -793,7 +833,7 @@ final class AppModel: ObservableObject {
 
     @objc private func willSleep() {
         guard choice.appDecides else { return }
-        let keep = callActive ? callBefore : choice
+        let keep = callActive ? callBefore : hoursActive ? hoursBefore : choice
         beforeSleep = backAfterSleep && keep.appDecides ? keep : nil
         // With "Choice back after sleep" on, the choice returns by itself, so there is nothing to tell.
         handBack(telling: beforeSleep == nil ? "The Mac went to sleep, so it has the fans again." : nil,
@@ -832,6 +872,78 @@ final class AppModel: ObservableObject {
         pretendCall = word == "on" ? true : word == "off" ? false : nil
         Diary.note("Asked from outside to pretend: call \(word)")
         checkCall()
+    }
+
+    // MARK: 0.5 — quiet hours, the battery heat notice, was the choice worth it
+
+    private var minuteNow: Int { pretendMinute ?? QuietHours.minute(of: wall) }
+
+    /// Between the two times Quiet comes on by itself; afterwards the choice from before comes back.
+    private func checkHours() {
+        guard quietHours || hoursActive else { return }
+        let inside = QuietHours.inside(minute: minuteNow, from: quietFrom, to: quietTo)
+        if !inside { hoursSpent = false }
+        switch QuietHours.step(enabled: quietHours, inside: inside, active: hoursActive) {
+        case .nothing:
+            break
+        case .goQuiet:
+            // On battery, during a call, or without the helper: not now; the next reading asks again.
+            guard !hoursSpent, helper == .ready, parked == nil, !callActive else { return }
+            // Quiet is on already, by your own tap: yours it stays.
+            guard choice != .quiet else { hoursSpent = true; return }
+            // Just woken: what "Choice back after sleep" was about to bring back is what comes back after the hours.
+            hoursBefore = beforeSleep ?? choice
+            beforeSleep = nil
+            hoursActive = true
+            tell("Quiet hours began: Quiet")
+            Diary.note("Quiet hours (\(QuietHours.words(quietFrom)) to \(QuietHours.words(quietTo))): Quiet (before: \(hoursBefore.title))")
+            choose(.quiet, by: .hours)
+            // The helper said no, or something else kept Quiet from starting: do not ask every second.
+            if choice != .quiet { hoursActive = false; hoursSpent = true }
+        case .putBack:
+            let back = hoursBefore
+            hoursActive = false
+            Diary.note("Quiet hours are over: back to \(back.title)")
+            tell(back.appDecides ? "Quiet hours ended: \(back.title) again" : "Quiet hours ended: the Mac has the fans again")
+            if back.appDecides {
+                choose(back, by: .hoursEnd)
+            } else {
+                handBack(telling: nil, why: "quiet hours ended", story: nil)
+            }
+        }
+    }
+
+    /// The battery above 35° for ten minutes is worth a word, whoever has the fans.
+    private func checkBattery() {
+        batteryWarmSince = BatteryNotice.hotSince(battery: pretendBatteryTemp ?? battery, now: now, since: batteryWarmSince)
+        guard BatteryNotice.due(enabled: batteryNotice, hotSince: batteryWarmSince, now: now, lastTold: lastBatteryNotice) else { return }
+        lastBatteryNotice = now
+        let minutes = Int(BatteryNotice.patience / 60)
+        tell("Battery heat notice: the battery was above \(Int(BatteryNotice.limit))° for \(minutes) minutes")
+        Diary.note("Battery heat notice sent (battery \(Words.degrees(battery)))")
+        // "Switch to Cool" only makes sense while the Mac decides.
+        notify("The battery has been above \(Int(BatteryNotice.limit))° for \(minutes) minutes (now \(Words.degrees(battery))).",
+               category: choice.appDecides ? nil : Self.heatCategory)
+    }
+
+    /// A choice of yours ends: what it did to the chip goes into "What happened".
+    private func tellWorth(of was: FanChoice) {
+        guard let text = Worth.words(title: was.title, seconds: wall - choiceSince, from: worthFrom, to: chip) else { return }
+        tell(text)
+    }
+
+    /// For checks: "22:30" pretends it is that time of day (for quiet hours only); anything else looks at the clock again.
+    func pretend(clock word: String) {
+        let parts = word.split(separator: ":").compactMap { Int($0) }
+        pretendMinute = parts.count == 2 ? QuietHours.clean(parts[0] * 60 + parts[1]) : nil
+        Diary.note("Asked from outside to pretend: the time is \(word)")
+        checkHours()
+    }
+
+    /// For checks: a number pretends the battery has that temperature until the next real reading differs.
+    func pretend(battery degrees: Double?) {
+        pretendBatteryTemp = degrees
+        Diary.note("Asked from outside to pretend: battery \(degrees.map { Words.degrees($0) } ?? "real")")
     }
 
     // MARK: 0.2 — what happened, and word to other apps

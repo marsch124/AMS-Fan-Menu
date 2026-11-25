@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private static let pretendBatteryName = Notification.Name("com.schabbauer.AMSFanMenu.pretendBattery")
     private static let pretendCallName = Notification.Name("com.schabbauer.AMSFanMenu.pretendCall")
     private static let pretendChipName = Notification.Name("com.schabbauer.AMSFanMenu.pretendChip")
+    private static let pretendClockName = Notification.Name("com.schabbauer.AMSFanMenu.pretendClock")
+    private static let pretendBatteryTempName = Notification.Name("com.schabbauer.AMSFanMenu.pretendBatteryTemp")
 
     /// Tells the running copy something, then quits. A moment for the message to leave: quitting at once lost it.
     private func tellRunningCopy(_ name: Notification.Name, _ word: String?) {
@@ -102,7 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
         for (flag, name) in [("--pretend-battery", Self.pretendBatteryName), ("--pretend-call", Self.pretendCallName),
-                             ("--pretend-chip", Self.pretendChipName)] {
+                             ("--pretend-chip", Self.pretendChipName),
+                             // 0.5: "--pretend-clock 22:30|real" for quiet hours, "--pretend-battery-temp 37|real"
+                             // for the battery heat notice.
+                             ("--pretend-clock", Self.pretendClockName), ("--pretend-battery-temp", Self.pretendBatteryTempName)] {
             if let index = arguments.firstIndex(of: flag), index + 1 < arguments.count {
                 tellRunningCopy(name, arguments[index + 1])
                 return
@@ -173,6 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         center.addObserver(self, selector: #selector(pretendBattery(_:)), name: Self.pretendBatteryName, object: nil)
         center.addObserver(self, selector: #selector(pretendCall(_:)), name: Self.pretendCallName, object: nil)
         center.addObserver(self, selector: #selector(pretendChip(_:)), name: Self.pretendChipName, object: nil)
+        center.addObserver(self, selector: #selector(pretendClock(_:)), name: Self.pretendClockName, object: nil)
+        center.addObserver(self, selector: #selector(pretendBatteryTemp(_:)), name: Self.pretendBatteryTempName, object: nil)
         let notes = UNUserNotificationCenter.current()
         notes.delegate = self
         // The heat notice carries a button.
@@ -184,6 +191,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @objc private func showSettings() { openSettings() }
     @objc private func showGraph() { openGraph() }
     @objc private func pretendWake() { model?.pretendSleepAndWake() }
+    @objc private func pretendClock(_ notification: Notification) { model?.pretend(clock: notification.object as? String ?? "real") }
+    @objc private func pretendBatteryTemp(_ notification: Notification) {
+        model?.pretend(battery: (notification.object as? String).flatMap(Double.init))
+    }
     @objc private func pretendBattery(_ notification: Notification) { model?.pretend(battery: notification.object as? String ?? "real") }
     @objc private func pretendCall(_ notification: Notification) { model?.pretend(call: notification.object as? String ?? "real") }
     @objc private func pretendChip(_ notification: Notification) { model?.pretend(chip: notification.object as? String ?? "real") }
