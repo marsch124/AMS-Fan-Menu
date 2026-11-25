@@ -13,11 +13,17 @@ public struct Sample: Codable, Equatable, Sendable {
     public let chip: Double?
     /// One speed per fan, in turns a minute.
     public let speeds: [Double]
+    /// The graphics temperature in °C; nil when there was no reading, and in every reading kept before 0.4.
+    public let graphics: Double?
+    /// The battery temperature in °C; nil when there was no reading, and in every reading kept before 0.4.
+    public let battery: Double?
 
-    public init(time: Double, chip: Double?, speeds: [Double]) {
+    public init(time: Double, chip: Double?, speeds: [Double], graphics: Double? = nil, battery: Double? = nil) {
         self.time = time
         self.chip = chip
         self.speeds = speeds
+        self.graphics = graphics
+        self.battery = battery
     }
 }
 
@@ -147,6 +153,132 @@ public enum Plot {
     public static func meanSpeed(_ sample: Sample) -> Double? {
         guard !sample.speeds.isEmpty else { return nil }
         return sample.speeds.reduce(0, +) / Double(sample.speeds.count)
+    }
+}
+
+// MARK: The three temperatures and their level lines (0.4)
+
+/// One of the three temperatures the Mac reports.
+public enum Sensor: String, CaseIterable, Sendable {
+    case chip, graphics, battery
+
+    public var title: String {
+        switch self {
+        case .chip: return "Chip temperature"
+        case .graphics: return "Graphics temperature"
+        case .battery: return "Battery temperature"
+        }
+    }
+
+    public func value(in sample: Sample) -> Double? {
+        switch self {
+        case .chip: return sample.chip
+        case .graphics: return sample.graphics
+        case .battery: return sample.battery
+        }
+    }
+
+    /// The scale of this graph always reaches at least this high, so its level lines are in view.
+    public var scaleTop: Double { self == .battery ? 50 : 110 }
+}
+
+/// A temperature that means something: a flat line across a graph, with its words.
+public struct Level: Equatable, Sendable {
+    /// `watch` = from here it needs your eye (amber); `tooHot` = from here something protects itself (red);
+    /// `macFull` = here the Mac itself took the fans to full (green).
+    public enum Kind: String, Sendable { case watch, tooHot, macFull }
+    public let kind: Kind
+    public let degrees: Double
+    public let words: String
+
+    public init(kind: Kind, degrees: Double, words: String) {
+        self.kind = kind
+        self.degrees = degrees
+        self.words = words
+    }
+}
+
+/// The level lines of each graph. Only figures that are true are here: the app's own rules, Apple's one
+/// published figure, one named measurement, and what this Mac itself was seen to do. Apple publishes no figure
+/// for where the chip slows itself or where the Mac turns itself off, so there is no line for those.
+public enum Levels {
+    /// Apple: use a Mac laptop where it is 10° to 35° (the room, not the battery itself).
+    public static let appleRoomLimit = 35.0
+    /// Charging stopped at 44° on the battery sensor in one test (Howard Oakley, 2021, an M1 MacBook Air).
+    public static let chargingMayStop = 44.0
+
+    public static func of(_ sensor: Sensor, fullSeenAt: Double? = nil) -> [Level] {
+        switch sensor {
+        case .chip:
+            var out = [
+                Level(kind: .watch, degrees: HeatNotice.limit, words: "Heat notice \(Words.degrees(HeatNotice.limit))"),
+                Level(kind: .tooHot, degrees: HeatGuard.limit, words: "Too hot \(Words.degrees(HeatGuard.limit))"),
+            ]
+            if let fullSeenAt, fullSeenAt.isFinite {
+                out.append(Level(kind: .macFull, degrees: fullSeenAt,
+                                 words: "Fans at full in Automatic \u{00B7} seen at \(Words.degrees(fullSeenAt))"))
+            }
+            return out
+        case .graphics:
+            return []
+        case .battery:
+            return [
+                Level(kind: .watch, degrees: appleRoomLimit, words: "Apple's limit for the room \(Words.degrees(appleRoomLimit))"),
+                Level(kind: .tooHot, degrees: chargingMayStop, words: "Charging may stop about \(Words.degrees(chargingMayStop))"),
+            ]
+        }
+    }
+
+    /// The scale of a temperature graph with level lines: whole tens from below the lowest reading up to at
+    /// least the sensor's `scaleTop` (higher if a reading is higher). No readings: 30° below the top.
+    public static func scale(_ sensor: Sensor, _ samples: [Sample]) -> ClosedRange<Double> {
+        let values = samples.compactMap { sensor.value(in: $0) }
+        let top = max(sensor.scaleTop, ((values.max() ?? 0) / 10).rounded(.up) * 10)
+        guard let low = values.min() else { return (top - 30)...top }
+        let bottom = min((low / 10).rounded(.down) * 10, top - 30)
+        return bottom...top
+    }
+}
+
+/// The usual range on this Mac: where the middle 80 % of the kept readings lie.
+public enum Usual {
+    /// Readings needed before a range is shown: 30 minutes' worth.
+    public static let needs = 360
+
+    public static func band(_ values: [Double]) -> ClosedRange<Double>? {
+        guard values.count >= needs else { return nil }
+        let sorted = values.sorted()
+        let low = sorted[Int((Double(sorted.count - 1) * 0.1).rounded())]
+        let high = sorted[Int((Double(sorted.count - 1) * 0.9).rounded())]
+        return low...high
+    }
+
+    /// "usual here 41° to 78°"
+    public static func words(_ band: ClosedRange<Double>) -> String {
+        "usual here \(Words.degrees(band.lowerBound)) to \(Words.degrees(band.upperBound))"
+    }
+}
+
+/// Learns where the Mac itself takes the fans to full: the chip temperature on the reading where that
+/// first becomes true while the Mac has the fans.
+public enum FullSeen {
+    /// "Full" = the fans' average speed at or above this share of their average top speed.
+    public static let share = 0.9
+
+    public static func isFull(speeds: [Double], tops: [Double]) -> Bool {
+        guard !speeds.isEmpty, speeds.count == tops.count else { return false }
+        let top = tops.reduce(0, +) / Double(tops.count)
+        guard top > 0 else { return false }
+        return speeds.reduce(0, +) / Double(speeds.count) >= top * share
+    }
+
+    /// One reading. `wasFull` is what the reading before gave back. While the app runs the fans nothing is
+    /// learned and the answer is "was full", so a speed the app itself set is never taken for the Mac's
+    /// doing just after the fans go back.
+    public static func step(macHasFans: Bool, full: Bool, wasFull: Bool, chip: Double?) -> (wasFull: Bool, seenAt: Double?) {
+        guard macHasFans else { return (true, nil) }
+        guard full else { return (false, nil) }
+        return (true, wasFull ? nil : chip)
     }
 }
 

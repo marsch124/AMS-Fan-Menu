@@ -40,6 +40,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        // For checks: pictures of the large graph with the readings really kept on this Mac. Changes nothing.
+        if let index = arguments.firstIndex(of: "--graph-pictures"), index + 1 < arguments.count {
+            Snapshots.writeRealGraphs(to: URL(fileURLWithPath: arguments[index + 1]))
+            NSApp.terminate(nil)
+            return
+        }
         // For checks: prints the fans and temperatures as the Mac reports them, then quits. Changes nothing.
         if arguments.contains("--read") {
             print(AppModel(readOnly: true).readout())
@@ -259,7 +265,7 @@ struct GraphWindow: View {
     var close: () -> Void = {}
 
     var body: some View {
-        LargeGraph(history: model.history, now: model.historyNow, top: model.topSpeed, close: close)
+        LargeGraph(history: model.history, now: model.historyNow, top: model.topSpeed, fullSeenAt: model.fullSeenAt, close: close)
     }
 }
 
@@ -290,6 +296,8 @@ enum Snapshots {
             let sample = AppModel.sample(.automatic)
             save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-\(tag).png"))
+            save(LargeGraph(history: sample.history, now: sample.historyNow, top: sample.topSpeed, fullSeenAt: 97).background(back)
+                    .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-seen-\(tag).png"))
             save(LargeGraph(history: History(), now: sample.historyNow, top: sample.topSpeed, startSpan: .quarter).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("graph-empty-\(tag).png"))
             // The whole Settings tab, however long, so every switch can be seen in a picture.
@@ -300,7 +308,7 @@ enum Snapshots {
                      folder.appendingPathComponent("\(name)-\(tag).png"))
             }
             // The whole guide and the signs, however long, so every line can be read in a picture.
-            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 4200).background(back)
+            save(SettingsView(model: .sample(.automatic), scrolls: false, startTab: .guide).frame(height: 5600).background(back)
                     .environment(\.colorScheme, scheme), folder.appendingPathComponent("settings-guide-whole-\(tag).png"))
             let dark = scheme == .dark
             for (name, decides) in [("mac-decides", false), ("you-decide", true)] {
@@ -309,6 +317,21 @@ enum Snapshots {
         }
         // The tile on its own, large, to judge the drawing.
         save(Image(nsImage: TileArt.image(size: 256)), folder.appendingPathComponent("tile-256.png"))
+    }
+
+    /// The large graph as it is on this Mac now: the kept readings, each time span, by day and by night.
+    @MainActor
+    static func writeRealGraphs(to folder: URL) {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        guard let history = AppModel.keptHistory(), let last = history.samples.last else { return }
+        let seen = AppModel.keptFullSeenAt()
+        for (scheme, tag) in [(ColorScheme.light, "day"), (ColorScheme.dark, "night")] {
+            let back = scheme == .dark ? Color(white: 0.16) : Color(white: 0.96)
+            for span in GraphSpan.allCases {
+                save(LargeGraph(history: history, now: last.time, top: 5776, fullSeenAt: seen, startSpan: span).background(back)
+                        .environment(\.colorScheme, scheme), folder.appendingPathComponent("real-\(span.rawValue)-\(tag).png"))
+            }
+        }
     }
 
     /// The menu bar item on a piece of menu bar, drawn for day or for night.

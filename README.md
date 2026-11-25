@@ -10,7 +10,7 @@ It is a personal app, made for an Apple Silicon MacBook Pro (a 16-inch 2021, two
 - Hovering over the mark also gives the figures (fan speeds and chip temperature).
 - A panel that opens on click, with the live speed of the left and right fan and the chip, graphics and battery temperatures.
 - Six choices: Automatic, Quiet, Cool, Full, My speed (slider), Follow temperature (two sliders). A "For" line makes a choice last 10 min, 30 min, 1 hour or until you change it.
-- A small graph of the last 15 minutes; a tap opens a large graph (15 minutes, 1 hour or 6 hours).
+- A small graph of the last 15 minutes; a tap opens a large window (15 minutes, 1 hour or 6 hours) with four graphs: chip, graphics and battery temperature, and fan speed (0.4). Level lines show where a temperature needs your eye, where it is too hot, and (learned on your Mac) where the Mac itself takes the fans to full.
 - A Settings window with four tabs (Settings, What happened, How it works, What's new): Open at login, your own Quiet and Cool speeds, a heat notice, Quiet during calls, the Mac decides on battery, choice back after sleep, and the helper.
 
 ## Build and install

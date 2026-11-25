@@ -255,4 +255,64 @@ final class MoreTests: XCTestCase {
         XCTAssertEqual(OutsideAsk.shown(pick: .untilChanged, ownSeconds: 600), .tenMinutes, "the For line shows the time that runs")
         XCTAssertNil(OutsideAsk.shown(pick: .hour, ownSeconds: 900), "a time that is none of the four lights none")
     }
+
+    /// 0.4: a reading carries all three temperatures; one kept before 0.4 has only the chip and still opens.
+    func testAReadingKeepsAllThreeTemperaturesAndOldOnesStillOpen() throws {
+        let new = Sample(time: 5, chip: 70, speeds: [1500], graphics: 64, battery: 31)
+        let back = try JSONDecoder().decode(Sample.self, from: JSONEncoder().encode(new))
+        XCTAssertEqual(back, new)
+        XCTAssertEqual(Sensor.graphics.value(in: back), 64)
+        XCTAssertEqual(Sensor.battery.value(in: back), 31)
+        let old = try JSONDecoder().decode(Sample.self, from: Data(#"{"time":5,"chip":70,"speeds":[1500]}"#.utf8))
+        XCTAssertEqual(old.chip, 70)
+        XCTAssertNil(old.graphics)
+        XCTAssertNil(old.battery)
+    }
+
+    /// 0.4: the level lines hold only true figures, and the scale always shows them.
+    func testLevelLinesAndTheirScale() {
+        XCTAssertEqual(Levels.of(.chip).map(\.degrees), [90, 100])
+        XCTAssertEqual(Levels.of(.chip).map(\.words), ["Heat notice 90°", "Too hot 100°"])
+        XCTAssertEqual(Levels.of(.chip, fullSeenAt: 97.4).last?.words, "Fans at full in Automatic · seen at 97°")
+        XCTAssertEqual(Levels.of(.chip, fullSeenAt: 97.4).last?.kind, .macFull)
+        XCTAssertTrue(Levels.of(.graphics).isEmpty, "nobody gives a figure for the graphics")
+        XCTAssertEqual(Levels.of(.battery).map(\.degrees), [35, 44])
+        XCTAssertEqual(Levels.scale(.chip, []), 80...110)
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 56), sample(5, chip: 78)]), 50...110)
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 112)]), 90...120, "a reading above the top lifts it")
+        XCTAssertEqual(Levels.scale(.chip, [sample(0, chip: 95)]), 80...110, "never less than 30° tall")
+        let cool = Sample(time: 0, chip: 60, speeds: [], graphics: 55, battery: 28)
+        XCTAssertEqual(Levels.scale(.battery, [cool]), 20...50)
+        XCTAssertEqual(Levels.scale(.graphics, [cool]), 50...110)
+    }
+
+    /// 0.4: the usual range is the middle 80 % of the kept readings, and needs 30 minutes of them.
+    func testUsualRange() {
+        XCTAssertNil(Usual.band(Array(repeating: 60, count: 359)))
+        let values = (0..<1000).map { 40 + Double($0) * 0.05 }   // 40.00 … 89.95
+        let band = Usual.band(values.shuffled())
+        XCTAssertEqual(band?.lowerBound ?? 0, 45, accuracy: 0.1)
+        XCTAssertEqual(band?.upperBound ?? 0, 85, accuracy: 0.1)
+        XCTAssertEqual(Usual.words(41.2...77.6), "usual here 41° to 78°")
+    }
+
+    /// 0.4: where the Mac itself takes the fans to full is learned on the reading where that begins.
+    func testFansAtFullInAutomaticIsLearnedOnlyFromTheMac() {
+        let tops = [5348.0, 5776.0]
+        XCTAssertFalse(FullSeen.isFull(speeds: [3000, 3000], tops: tops))
+        XCTAssertTrue(FullSeen.isFull(speeds: [5100, 5300], tops: tops))
+        XCTAssertFalse(FullSeen.isFull(speeds: [], tops: tops))
+        // The Mac has the fans, they reach full: learned once, at that reading.
+        var step = FullSeen.step(macHasFans: true, full: true, wasFull: false, chip: 97)
+        XCTAssertEqual(step.seenAt, 97)
+        step = FullSeen.step(macHasFans: true, full: true, wasFull: step.wasFull, chip: 92)
+        XCTAssertNil(step.seenAt, "still full: nothing new, even though the chip has cooled")
+        // You set Full, then give the fans back while they still spin fast: that was not the Mac's doing.
+        step = FullSeen.step(macHasFans: false, full: true, wasFull: false, chip: 70)
+        XCTAssertNil(step.seenAt)
+        step = FullSeen.step(macHasFans: true, full: true, wasFull: step.wasFull, chip: 70)
+        XCTAssertNil(step.seenAt)
+        step = FullSeen.step(macHasFans: true, full: false, wasFull: step.wasFull, chip: 65)
+        XCTAssertFalse(step.wasFull)
+    }
 }

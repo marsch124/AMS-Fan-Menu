@@ -87,6 +87,9 @@ final class AppModel: ObservableObject {
     /// The readings behind the graphs, and the time of the newest one.
     @Published private(set) var history = History()
     @Published private(set) var historyNow = Date().timeIntervalSince1970
+    // 0.4
+    /// The chip temperature at which the Mac itself was last seen to take the fans to full; nil = not seen yet.
+    @Published private(set) var fullSeenAt: Double?
 
     /// Only an open panel needs fresh readings every second.
     var panelOpen = false {
@@ -146,6 +149,8 @@ final class AppModel: ObservableObject {
     /// For checks: pretend the chip has this temperature (only for the rest, nothing else).
     private var pretendChip: Double?
     private var lastHistorySave = 0.0
+    /// The fans were at full on the reading before (or the app ran them): nothing new to learn until they slow.
+    private var wasFull = true
 
     private enum Key {
         static let percent = "mySpeedPercent", start = "followStart", full = "followFull"
@@ -153,6 +158,7 @@ final class AppModel: ObservableObject {
         static let heatNotice = "heatNotice", quietInCalls = "quietInCalls", batteryRule = "batteryRule", backAfterSleep = "backAfterSleep"
         static let quietRest = "quietRest"
         static let happened = "happened"
+        static let fullSeenAt = "fullSeenAt"
     }
     static let heatCategory = "heat"
     static let switchToCoolAction = "switchToCool"
@@ -168,6 +174,17 @@ final class AppModel: ObservableObject {
     }
     private static var historyFile: URL { supportFolder.appendingPathComponent("history.json") }
     static var stateFile: URL { supportFolder.appendingPathComponent("state.json") }
+
+    /// For checks: the readings as they are kept on this Mac. Only reads.
+    static func keptHistory() -> History? {
+        guard let data = try? Data(contentsOf: historyFile) else { return nil }
+        return try? JSONDecoder().decode(History.self, from: data)
+    }
+
+    /// For checks: where the Mac was last seen to take the fans to full, if ever. Only reads.
+    static func keptFullSeenAt() -> Double? {
+        UserDefaults.standard.object(forKey: Key.fullSeenAt) as? Double
+    }
 
     /// `readOnly`: only looks at the fans and temperatures once, for a check from outside. It changes nothing:
     /// no helper, no state file, no history. (0.2 found this the hard way: a check overwrote the state file.)
@@ -187,6 +204,7 @@ final class AppModel: ObservableObject {
         batteryRule = store.object(forKey: Key.batteryRule) as? Bool ?? true
         backAfterSleep = store.object(forKey: Key.backAfterSleep) as? Bool ?? false
         quietRest = store.object(forKey: Key.quietRest) as? Bool ?? true
+        fullSeenAt = store.object(forKey: Key.fullSeenAt) as? Double
         smc = live || readOnly ? SMC() : nil
         guard self.live else {
             if readOnly { read() }
@@ -262,9 +280,23 @@ final class AppModel: ObservableObject {
     /// One reading every five seconds goes into the history behind the graphs.
     private func addSample() {
         let time = wall
-        guard history.add(Sample(time: time, chip: chip, speeds: fans.compactMap(\.speed))) else { return }
+        guard history.add(Sample(time: time, chip: chip, speeds: fans.compactMap(\.speed),
+                                 graphics: graphics, battery: battery)) else { return }
         historyNow = time
+        learnFull()
         if now - lastHistorySave > 300 { saveHistory() }
+    }
+
+    /// Where the Mac itself takes the fans to full: the chip temperature on the reading where that begins.
+    private func learnFull() {
+        let speeds = fans.compactMap(\.speed)
+        let full = speeds.count == fans.count && FullSeen.isFull(speeds: speeds, tops: fans.map(\.range.top))
+        let step = FullSeen.step(macHasFans: !choice.appDecides || resting, full: full, wasFull: wasFull, chip: chip)
+        wasFull = step.wasFull
+        guard let seen = step.seenAt else { return }
+        fullSeenAt = seen
+        UserDefaults.standard.set(seen, forKey: Key.fullSeenAt)
+        Diary.note("The Mac itself took the fans to full with the chip at \(Words.degrees(seen))")
     }
 
     private func saveHistory() {

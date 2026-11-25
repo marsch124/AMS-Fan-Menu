@@ -1,7 +1,8 @@
 import FanMenuCore
 import SwiftUI
 
-// The graphs: how the chip temperature (coral) reacted to the fan speed (blue) after the choice changed.
+// The graphs: how the temperatures (coral) reacted to the fan speed (blue) after the choice changed, and
+// where each temperature stands against the levels that mean something.
 
 /// One line in a plot: its colour and where its value sits in a reading.
 private struct PlotLine {
@@ -57,13 +58,24 @@ private struct PlotDrawing: View {
     let span: Double
     var grid = false
     var titles = false
+    /// Flat lines at temperatures that mean something, each with its words at the right end.
+    var levels: [Level] = []
+    /// The usual range on this Mac: a soft grey band.
+    var usual: ClosedRange<Double>?
     let inset: CGFloat = 4
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
             let xs = marks.map { inset + CGFloat(Plot.x(time: $0.time, now: now, span: span)) * (size.width - 2 * inset) }
+            let shown = levels.filter { scale.contains($0.degrees) }.sorted { $0.degrees > $1.degrees }
             ZStack(alignment: .topLeading) {
+                if let usual, usual.upperBound > scale.lowerBound, usual.lowerBound < scale.upperBound {
+                    let top = height(usual.upperBound, size), bottom = height(usual.lowerBound, size)
+                    Rectangle().fill(Color.primary.opacity(0.08))
+                        .frame(width: size.width, height: max(bottom - top, 2)).offset(y: top)
+                }
                 if grid {
                     Path { p in
                         for f in [0.0, 0.5, 1.0] {
@@ -71,6 +83,12 @@ private struct PlotDrawing: View {
                             p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
                         }
                     }.stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+                }
+                ForEach(shown.indices, id: \.self) { i in
+                    Path { p in
+                        let y = height(shown[i].degrees, size)
+                        p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
+                    }.stroke(levelColor(shown[i].kind, scheme).opacity(0.85), lineWidth: 1)
                 }
                 Path { p in
                     for x in xs { p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: size.height)) }
@@ -85,8 +103,43 @@ private struct PlotDrawing: View {
                             .offset(x: item.x + 3, y: 1)
                     }
                 }
+                ForEach(Array(levelWords(shown, size).enumerated()), id: \.offset) { _, item in
+                    Text(item.level.words).font(.caption2.weight(.medium)).foregroundStyle(levelColor(item.level.kind, scheme))
+                        .padding(.horizontal, 3)
+                        .background(RoundedRectangle(cornerRadius: 3).fill(Color(nsColor: .windowBackgroundColor).opacity(0.7)))
+                        .fixedSize().frame(width: max(size.width - 2 - item.inFromRight, 0), alignment: .trailing)
+                        .offset(y: item.y)
+                }
             }
         }
+    }
+
+    /// Where a temperature sits, in points from the top of the drawing.
+    private func height(_ degrees: Double, _ size: CGSize) -> CGFloat {
+        size.height - inset - CGFloat(Plot.y(degrees, in: scale)) * (size.height - 2 * inset)
+    }
+
+    /// The words of each level line, at the right end: above the line when there is room. A line closer than a
+    /// line of words to the one above has its words below it, and if those are taken too, further in from the right.
+    private func levelWords(_ shown: [Level], _ size: CGSize) -> [(level: Level, y: CGFloat, inFromRight: CGFloat)] {
+        var out: [(level: Level, y: CGFloat, inFromRight: CGFloat)] = []
+        var lastLine: CGFloat?
+        var lastBelow = false
+        var taken: CGFloat = 0
+        for level in shown {
+            let line = height(level.degrees, size)
+            let crowded = lastLine.map { line - $0 < 13 } ?? false
+            let below = crowded || line < 14
+            if crowded, lastBelow, let before = out.last {
+                taken += CGFloat(before.level.words.count) * 5.6 + 14
+            } else {
+                taken = 0
+            }
+            out.append((level, below ? line + 1 : line - 14, taken))
+            lastLine = line
+            lastBelow = below
+        }
+        return out
     }
 
     /// Each mark's title, skipping one that would start less than 44 points after the previous one.
@@ -96,6 +149,16 @@ private struct PlotDrawing: View {
             out.append((x, mark.title))
         }
         return out
+    }
+}
+
+/// Amber = from here it needs your eye; red = too hot, something protects itself; green = the Mac itself
+/// took the fans to full here.
+private func levelColor(_ kind: Level.Kind, _ scheme: ColorScheme) -> Color {
+    switch kind {
+    case .watch: return Palette.warn(scheme)
+    case .tooHot: return Palette.danger(scheme)
+    case .macFull: return Palette.mac(scheme)
     }
 }
 
@@ -143,11 +206,14 @@ struct SmallGraph: View {
     }
 }
 
-/// The large graph in its own window: a picker for 15 minutes / 1 hour / 6 hours, then two plots, one above the other.
+/// The large graph in its own window: a picker for 15 minutes / 1 hour / 6 hours, then four plots, one above
+/// the other: the three temperatures with their level lines, and the fan speed.
 struct LargeGraph: View {
     let history: History
     let now: Double
     let top: Double
+    /// The chip temperature at which the Mac itself was last seen to take the fans to full; nil = not seen yet.
+    var fullSeenAt: Double?
     var close: () -> Void = {}
     var startSpan: GraphSpan = .hour
     @State private var span: GraphSpan?
@@ -158,7 +224,6 @@ struct LargeGraph: View {
     var body: some View {
         let samples = history.samples(last: current.seconds, now: now)
         let marks = history.marks(last: current.seconds, now: now)
-        let tempScale = Plot.temperatureScale(samples)
         let speedScale = Plot.speedScale(samples, top: top)
         let fans = min(2, samples.map { $0.speeds.count }.max() ?? 0)
         let fanLines = (0..<max(fans, 1)).map { i in
@@ -167,23 +232,36 @@ struct LargeGraph: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Temperature and fan speed").font(.title3.weight(.semibold))
             HStack(spacing: 6) { ForEach(GraphSpan.allCases, id: \.self) { tab($0) } }
-            plot("Chip temperature", color: Palette.heat(scheme), legend: false, samples: samples, marks: marks,
-                 lines: [PlotLine(color: Palette.heat(scheme), value: { $0.chip })], scale: tempScale,
-                 figures: [tempScale.upperBound, (tempScale.lowerBound + tempScale.upperBound) / 2, tempScale.lowerBound].map { Words.degrees($0) },
-                 titles: true, fans: fans)
-            plot("Fan speed", color: Palette.fan(scheme), legend: fans == 2, samples: samples, marks: marks,
-                 lines: fanLines, scale: speedScale,
-                 figures: [speedScale.upperBound, (speedScale.lowerBound + speedScale.upperBound) / 2, speedScale.lowerBound].map { Words.turns($0) },
-                 titles: false, fans: fans)
+            ForEach(Sensor.allCases, id: \.self) { sensor in
+                temperature(sensor, samples: samples, marks: marks)
+            }
+            PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 10) {
+                        Text("Fan speed").font(.caption.weight(.semibold)).foregroundStyle(Palette.fan(scheme))
+                        if fans == 2 { legendItem("Left", 1); legendItem("Right", 0.55) }
+                    }
+                    axisAndDrawing(figures: [speedScale.upperBound, (speedScale.lowerBound + speedScale.upperBound) / 2, speedScale.lowerBound].map { Words.turns($0) }) {
+                        PlotDrawing(samples: samples, marks: marks, lines: fanLines, scale: speedScale, now: now,
+                                    span: current.seconds, grid: true, titles: true)
+                    }
+                }
+                .padding(.horizontal, 8).padding(.vertical, 6)
+            }
+            .frame(height: 118)
+            .accessibilityIdentifier("plot-fans")
             HStack {
                 Text(spanAgo).font(.caption2).foregroundStyle(.secondary)
                 Spacer()
                 Text("now").font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.leading, 56).padding(.trailing, 8)
-            HStack(spacing: 8) {
-                Text("Coral = chip temperature · blue = fan speed · dashed line = you changed the choice")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .bottom, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Coral = temperature \u{00B7} blue = fan speed \u{00B7} dashed line = you changed the choice")
+                    Text("Apple gives no figure for when the Mac turns itself off, so there is no line for it.")
+                }
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
                 Button(action: close) {
                     Text("Done").font(.callout.weight(.semibold)).foregroundStyle(.white)
@@ -194,7 +272,7 @@ struct LargeGraph: View {
             }
         }
         .padding(14)
-        .frame(width: 560, height: 470, alignment: .topLeading)
+        .frame(width: 560, height: 690, alignment: .topLeading)
         .accessibilityIdentifier("largeGraph")
     }
 
@@ -217,29 +295,55 @@ struct LargeGraph: View {
         .buttonStyle(PressStyle()).accessibilityIdentifier("span-\(item.rawValue == "sixHours" ? "six" : item.rawValue)")
     }
 
-    private func plot(_ heading: String, color: Color, legend: Bool, samples: [Sample], marks: [ChoiceMark],
-                      lines: [PlotLine], scale: ClosedRange<Double>, figures: [String], titles: Bool, fans: Int) -> some View {
-        PlotBox(hasData: samples.count >= 2, empty: "No readings yet for this time") {
+    /// One temperature: its name with the figure now and the usual range beside it, then the line over its
+    /// level lines and the grey band of what is usual on this Mac.
+    private func temperature(_ sensor: Sensor, samples: [Sample], marks: [ChoiceMark]) -> some View {
+        let values = samples.compactMap { sensor.value(in: $0) }
+        let scale = Levels.scale(sensor, samples)
+        let usual = Usual.band(history.samples.compactMap { sensor.value(in: $0) })
+        var extras: [String] = []
+        if let usual { extras.append(Usual.words(usual)) }
+        if sensor == .chip, fullSeenAt == nil { extras.append("fans at full in Automatic: not seen yet") }
+        return PlotBox(hasData: values.count >= 2, empty: "No \(sensor.title.lowercased()) readings yet for this time") {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 10) {
-                    Text(heading).font(.caption.weight(.semibold)).foregroundStyle(color)
-                    if legend { legendItem("Left", 1); legendItem("Right", 0.55) }
-                }
-                HStack(spacing: 0) {
-                    VStack(alignment: .trailing) {
-                        ForEach(figures.indices, id: \.self) { i in
-                            if i > 0 { Spacer(minLength: 0) }
-                            Text(figures[i]).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                        }
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(sensor.title).font(.caption.weight(.semibold)).foregroundStyle(Palette.heat(scheme))
+                    Text(Words.degrees(values.last)).font(.caption.weight(.semibold).monospacedDigit())
+                        .accessibilityIdentifier("now-\(sensor.rawValue)")
+                    if usual != nil {
+                        RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.16)).frame(width: 12, height: 8)
+                            .padding(.leading, 4)
                     }
-                    .padding(.trailing, 4).frame(width: 40)
-                    PlotDrawing(samples: samples, marks: marks, lines: lines, scale: scale, now: now,
-                                span: current.seconds, grid: true, titles: titles)
+                    if !extras.isEmpty {
+                        Text(extras.joined(separator: " \u{00B7} ")).font(.caption2).foregroundStyle(.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                }
+                axisAndDrawing(figures: [scale.upperBound, (scale.lowerBound + scale.upperBound) / 2, scale.lowerBound].map { Words.degrees($0) }) {
+                    PlotDrawing(samples: samples, marks: marks,
+                                lines: [PlotLine(color: Palette.heat(scheme), value: { sensor.value(in: $0) })],
+                                scale: scale, now: now, span: current.seconds, grid: true,
+                                levels: Levels.of(sensor, fullSeenAt: fullSeenAt), usual: usual)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
         }
-        .frame(height: 150)
+        .frame(height: 128)
+        .accessibilityIdentifier("plot-\(sensor.rawValue)")
+    }
+
+    /// The figures of the scale at the left (top, middle, bottom), then the drawing.
+    private func axisAndDrawing<Drawing: View>(figures: [String], @ViewBuilder drawing: () -> Drawing) -> some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .trailing) {
+                ForEach(figures.indices, id: \.self) { i in
+                    if i > 0 { Spacer(minLength: 0) }
+                    Text(figures[i]).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.trailing, 4).frame(width: 40)
+            drawing()
+        }
     }
 
     private func legendItem(_ name: String, _ opacity: Double) -> some View {
@@ -272,7 +376,8 @@ extension History {
                 let k = 1 - exp(-(time - autoAt) / (total / 10))
                 temp = 50 + 22 * k + wobble; speed = 2100 + wobble * 40
             }
-            history.add(Sample(time: time, chip: temp, speeds: [speed, speed + 60]))
+            history.add(Sample(time: time, chip: temp, speeds: [speed, speed + 60],
+                               graphics: temp - 8 + cos(time / 53), battery: 29 + (time - start) / total * 4 + sin(time / 91) * 0.4))
             time += History.every
         }
         history.mark("Cool", at: coolAt)
