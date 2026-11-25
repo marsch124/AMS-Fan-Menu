@@ -201,13 +201,19 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("By itself").font(.headline).foregroundStyle(Palette.mac(scheme))
                 switchRow("Heat notice", isOn: model.heatNotice, id: "heatNoticeToggle",
-                          words: "While the Mac decides: a notification when the chip has been at \(Int(HeatNotice.limit))° or more for \(Int(HeatNotice.patience / 60)) minutes, with the button “Switch to Cool”.") { model.setHeatNotice($0) }
+                          words: "While the Mac decides: a notification when the chip has been at \(Int(model.heatLevel))° or more for \(Int(HeatNotice.patience / 60)) minutes, with the button “Switch to Cool”.") { model.setHeatNotice($0) }
+                heatLevelRow
+                switchRow("Battery heat notice", isOn: model.batteryNotice, id: "batteryNoticeToggle",
+                          words: "A notification when the battery has been above 35° for 10 minutes. At most once an hour.") { model.setBatteryNotice($0) }
                 switchRow("Quiet during calls", isOn: model.quietInCalls, id: "quietInCallsToggle",
                           words: "When an app has used the microphone for \(Int(CallQuiet.startAfter)) seconds, the app switches to Quiet; \(Int(CallQuiet.endAfter)) seconds after the microphone is free, your choice from before comes back. Any app that listens counts, not only calls.") { model.setQuietInCalls($0) }
                 switchRow("On battery: the Mac decides", isOn: model.batteryRule, id: "batteryToggle",
                           words: "When the power cable is pulled, the fans go back to the Mac. With the cable back in, your choice comes back.") { model.setBatteryRule($0) }
                 switchRow("Choice back after sleep", isOn: model.backAfterSleep, id: "backAfterSleepToggle",
                           words: "Sleep always hands the fans to the Mac. With this on, your choice comes back about 5 seconds after the Mac wakes. Restart and quit still hand the fans to the Mac.") { model.setBackAfterSleep($0) }
+                switchRow("Quiet hours", isOn: model.quietHours, id: "quietHoursToggle",
+                          words: "Between the two times Quiet comes on by itself. Afterwards your choice from before comes back. Your own tap during the hours wins until the next evening.") { model.setQuietHours($0) }
+                quietTimesRow
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -268,8 +274,93 @@ struct SettingsView: View {
         return Calendar.current.isDateInToday(date) ? clock : Self.day.string(from: date) + " " + clock
     }
 
+    /// "From 80° 85° 90° 95°": the level of the heat notice; the one in use is full colour.
+    private var heatLevelRow: some View {
+        HStack(spacing: 6) {
+            Text("From").font(.callout).foregroundStyle(.secondary)
+            ForEach(HeatNotice.levels, id: \.self) { level in
+                let on = model.heatLevel == level
+                Button { model.setHeatLevel(level) } label: {
+                    Text("\(Int(level))°").font(.callout.weight(.medium)).monospacedDigit()
+                        .foregroundStyle(on ? Color.white : Palette.heat(scheme))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(on ? Palette.heatFill(scheme) : Palette.pale(Palette.heat(scheme), scheme),
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("Heat notice from \(Int(level)) degrees")
+                .accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityIdentifier("heatLevel-\(Int(level))")
+            }
+            Spacer(minLength: 0)
+        }
+        .disabled(!model.heatNotice)
+        .opacity(model.heatNotice ? 1 : 0.4)
+    }
+
+    /// "From 22:00 · To 07:00": two small time pickers, 24-hour.
+    private var quietTimesRow: some View {
+        HStack(spacing: 8) {
+            Text("From").font(.callout).foregroundStyle(.secondary)
+            timePicker(minutes: model.quietFrom, id: "quietFromPicker", label: "Quiet hours from") { model.setQuietTimes(from: $0) }
+            Text("To").font(.callout).foregroundStyle(.secondary).padding(.leading, 6)
+            timePicker(minutes: model.quietTo, id: "quietToPicker", label: "Quiet hours to") { model.setQuietTimes(to: $0) }
+            Spacer(minLength: 0)
+        }
+        .disabled(!model.quietHours)
+        .opacity(model.quietHours ? 1 : 0.4)
+    }
+
+    private func timePicker(minutes: Int, id: String, label: String, set: @escaping (Int) -> Void) -> some View {
+        let calendar = Calendar.current
+        let binding = Binding<Date>(
+            get: { calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date() },
+            set: { date in
+                let parts = calendar.dateComponents([.hour, .minute], from: date)
+                set((parts.hour ?? 0) * 60 + (parts.minute ?? 0))
+            })
+        return DatePicker(label, selection: binding, displayedComponents: .hourAndMinute)
+            .labelsHidden()
+            .datePickerStyle(.stepperField)
+            .environment(\.locale, Locale(identifier: "en_GB"))
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(id)
+    }
+
+    /// "25 Nov" style helpers live in Core; here only the block itself.
+    private var weekBlock: some View {
+        // Pictures hold no clock of their own: they count from the last day of the sample.
+        let now = scrolls ? Date().timeIntervalSince1970 : (model.week.days.last.map { $0.start + 43_200 } ?? Date().timeIntervalSince1970)
+        let summary = model.week.summary(now: now)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("The last 7 days").font(.headline).foregroundStyle(Palette.story(scheme))
+            if summary.isEmpty {
+                Text("Figures appear here as the days pass.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                weekRow("Hottest", Words.hottestMoment(summary.hottest, at: summary.hottestTime))
+                weekRow("At 90° or more", Words.duration(summary.secondsHot))
+                weekRow("Fans turning", Words.duration(summary.secondsFans))
+                weekRow("A choice of yours on", Words.duration(summary.secondsApp))
+                if let since = Words.countedSince(summary.since, days: summary.days) {
+                    Text(since).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("weekBlock")
+    }
+
+    private func weekRow(_ name: String, _ figure: String) -> some View {
+        (Text(name + " ").foregroundColor(.secondary) + Text(figure).fontWeight(.semibold))
+            .font(.callout).monospacedDigit()
+    }
+
     private var happenedPage: some View {
         VStack(alignment: .leading, spacing: 6) {
+            weekBlock.padding(.bottom, 6)
+            Text("What happened").font(.headline).foregroundStyle(Palette.story(scheme))
             Text("The last \(HappenedLog.shown) things the app did, newest first.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
