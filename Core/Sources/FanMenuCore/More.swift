@@ -203,6 +203,41 @@ public enum Lasting: String, CaseIterable, Codable, Sendable {
     }
 }
 
+// MARK: A wish from another app (0.3.1)
+
+/// What another app asks for over the `choose` notification (AMS Deck Mate's fan keys): the choice in
+/// its own word, "cool", or with a time of its own behind a colon, "cool:600" = Cool for 600 seconds,
+/// then the Mac gets the fans back. A time of its own never changes the pick in the "For" line.
+public enum OutsideAsk {
+    /// A time of its own is kept between one minute and four hours.
+    public static let shortest = 60.0
+    public static let longest = 4 * 3600.0
+
+    /// nil for anything that is not a choice (the wish is then ignored). Automatic never has a time.
+    public static func parse(_ word: String) -> (choice: FanChoice, seconds: Double?)? {
+        let parts = word.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        guard (1...2).contains(parts.count), let choice = FanChoice(rawValue: parts[0]) else { return nil }
+        guard parts.count == 2 else { return (choice, nil) }
+        guard let seconds = Double(parts[1]), seconds.isFinite, seconds > 0 else { return nil }
+        return (choice, choice.appDecides ? min(longest, max(shortest, seconds)) : nil)
+    }
+
+    /// In a sentence: "10 minutes", "1 hour", "90 minutes".
+    public static func words(seconds: Double) -> String {
+        if let known = Lasting.allCases.first(where: { $0.seconds == seconds }), let words = known.words { return words }
+        let minutes = Int((seconds / 60).rounded())
+        if minutes % 60 == 0 { return minutes == 60 ? "1 hour" : "\(minutes / 60) hours" }
+        return minutes == 1 ? "1 minute" : "\(minutes) minutes"
+    }
+
+    /// The time shown in full colour in the "For" line: the time of its own while one runs (none of the
+    /// four when it is not one of them), else his own pick.
+    public static func shown(pick: Lasting, ownSeconds: Double?) -> Lasting? {
+        guard let ownSeconds else { return pick }
+        return Lasting.allCases.first { $0.seconds == ownSeconds }
+    }
+}
+
 // MARK: Your own Quiet and Cool
 
 public enum Presets {

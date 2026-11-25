@@ -1,4 +1,4 @@
-# AMS Fan Menu 0.3 (build 4, 24 Nov 2026) - Specification
+# AMS Fan Menu 0.3.1 (build 5, 25 Nov 2026) - Specification
 
 ## Purpose
 
@@ -82,6 +82,7 @@ Before 0.3 Quiet always held both fans at the Quiet speed (at least the lowest r
 - When the time is up the app gives the fans back, switches to Automatic and notes it in What happened ("The time was up: the Mac has the fans again"). The status line counts down, for example "You decide: Cool · 8 min left".
 - Tapping a choice, or a time, starts the time afresh.
 - The pick is remembered (default Until I change).
+- A time of its own (0.3.1): a wish from another app may carry its own time (see "For other apps"). It applies to that one choice only: the end is set from it instead of from the pick, the pick in UserDefaults is not touched, and the "For" line draws the time that runs in full colour (the one of the four with the same number of seconds; none when it is not one of them) until the choice ends or changes. Rule `OutsideAsk.shown`. A tap on a time in the line while such a time runs takes over at once, also on the pick already stored. The time of its own is dropped when the fans go back to the Mac, when a call switches to Quiet, and when a choice comes back after battery, a call or sleep (those follow the pick).
 
 ## Graphs (0.2)
 
@@ -166,6 +167,8 @@ Only one copy of the app runs: the copy that started first stays.
 
 On every change the app writes its state to `~/Library/Application Support/AMS Fan Menu/state.json` (the choice, its title, whether the app decides, when it began, when it ends, and from 0.3 `resting`, true or false: true while Quiet lets the fans rest; `choice` stays "quiet" during a rest) and posts the distributed notification `com.schabbauer.AMSFanMenu.changed`. `--choose <choice>` switches. AMS Deck Mate's fan keys use this.
 
+The wish itself (0.3.1): the distributed notification `com.schabbauer.AMSFanMenu.choose` with the choice word as its object, `cool`, or the word, a colon and a number of seconds, `cool:600` = Cool for 600 seconds, then Automatic. Rule `OutsideAsk.parse`: the seconds are kept between 60 and 14,400 (four hours); Automatic never has a time; anything else (an unknown word, no number, zero or less, a second colon) is ignored. A wish without a time follows the pick in the "For" line, as before 0.3.1. `--choose cool:600` passes the same wish on. The diary notes "Asked from outside to switch to Cool for 10 minutes" and What happened lists "Cool for 10 minutes". AMS Deck Mate 0.19 asks for `cool:600` and `full:600`.
+
 ## How it is built
 
 - XcodeGen (`project.yml`) generates the Xcode project. Signed with an Apple Development certificate. macOS 15 or later.
@@ -201,6 +204,8 @@ Not proven yet:
 - 0.2 (build 3, 24 Nov 2026): graphs (small in the panel, large in its own window with 15 minutes / 1 hour / 6 hours, readings every 5 seconds, six hours kept, saved on this Mac); a choice for a limited time ("For" line); figures on hover; own Quiet (0 to 40 %) and Cool (30 to 90 %); heat notice (90 degrees for 5 minutes, at most every 30 minutes); Quiet during calls (microphone 15 seconds on, 30 seconds off); on battery the Mac decides; What happened tab (last 20); choice back after sleep (about 5 seconds after wake); four settings tabs; new sign (dashed line); state.json and the `changed` notification for other apps; hooks `--pretend-wake`, `--pretend-battery`, `--pretend-call`. Fixed: after an unexpected stop the app said "The Mac decides" while the helper held the old speed for up to 20 seconds; the app now asks the helper to give the fans back at start. The helper did not change (version 2), so no password is needed.
 
 - 0.3 (build 4, 24 Nov 2026): Quiet lets the fans stop. While Quiet is on and the chip has been at 60° or less for 30 seconds, the app gives the fans to the Mac, which stops them; if the Mac runs a fan more than 150 turns above the Quiet speed for 4 seconds, the app takes them again at the Quiet speed and holds them at least 5 minutes before another rest. Status line "You decide: Quiet · fans resting"; button and menu bar mark stay in full colour / blue. New switch "Quiet lets the fans stop" in "Your speeds" (setting `quietRest`, on by default; off = as in 0.2, switching off during a rest brings the Quiet speed back at once). `enum QuietRest` in `Core/Sources/FanMenuCore/More.swift`, one new rule test, `resting` key in state.json, hook `--pretend-chip <degrees>|real`. The helper did not change (version 2), so no password is needed.
+
+- 0.3.1 (build 5, 25 Nov 2026): a wish from another app may carry a time of its own (`cool:600`), for the Cool and Full keys of AMS Deck Mate 0.19 that last 10 minutes; the "For" line shows the time that runs; the pick is never changed by it; rule `OutsideAsk` with one data test (26 rule tests). The helper did not change (version 2), so no password is needed.
 
 ## Icon files
 

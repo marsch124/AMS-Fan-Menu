@@ -153,7 +153,8 @@ struct PanelView: View {
         HStack(spacing: 5) {
             Text("For").font(.caption).foregroundStyle(.secondary)
             ForEach(Lasting.allCases, id: \.self) { one in
-                let on = model.lasting == one
+                // A time another app asked for shows here while it runs (0.3.1); then his own pick again.
+                let on = OutsideAsk.shown(pick: model.lasting, ownSeconds: model.ownSeconds) == one
                 Button { model.setLasting(one) } label: {
                     Text(one.title).font(.caption.weight(.medium)).lineLimit(1).fixedSize()
                         .foregroundStyle(on ? Color.white : Palette.fan(scheme))

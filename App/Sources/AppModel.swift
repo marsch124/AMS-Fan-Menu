@@ -66,6 +66,8 @@ final class AppModel: ObservableObject {
     // 0.2
     /// How long a choice stays on.
     @Published private(set) var lasting: Lasting
+    /// A time another app asked for with its wish (0.3.1), while it runs; nil = the "For" line rules.
+    @Published private(set) var ownSeconds: Double?
     /// "8 min left" while a choice has an end.
     @Published private(set) var leftWords: String?
     /// Why the choice is what it is, when a rule set it: "during a call", "on battery".
@@ -321,7 +323,9 @@ final class AppModel: ObservableObject {
         return fresh
     }
 
-    func choose(_ new: FanChoice, by cause: Cause = .you) {
+    /// `forSeconds`: a time of its own for this one choice (a wish from another app); the pick in the
+    /// "For" line stays as it is.
+    func choose(_ new: FanChoice, by cause: Cause = .you, forSeconds: Double? = nil) {
         guard live else { choice = new; return }
         let yours = cause == .you || cause == .outside
         if yours {
@@ -354,12 +358,14 @@ final class AppModel: ObservableObject {
         overSince = nil
         reason = cause == .call ? "during a call" : nil
         // Quiet during a call lasts as long as the call, not as long as the "For" line says.
-        endsAt = cause == .call ? nil : lasting.endsAt(from: wall)
+        ownSeconds = cause == .call ? nil : forSeconds
+        endsAt = cause == .call ? nil : (forSeconds.map { wall + $0 } ?? lasting.endsAt(from: wall))
         leftWords = Lasting.leftWords(endsAt: endsAt, now: wall)
         if note?.kind == .told { note = nil }
         if before != new || yours {
-            Diary.note("Choice: \(new.title)" + (endsAt != nil ? " for \(lasting.title)" : ""))
-            if yours { tell(new.title + (lasting.words.map { " for \($0)" } ?? "")) }
+            let howLong = forSeconds.map(OutsideAsk.words(seconds:)) ?? lasting.words
+            Diary.note("Choice: \(new.title)" + (endsAt != nil ? " for \(howLong ?? lasting.title)" : ""))
+            if yours { tell(new.title + (howLong.map { " for \($0)" } ?? "")) }
             changed(to: new)
         }
         // Quiet on a Mac that is already cool: straight to the rest, without a second at the lowest speed first.
@@ -417,6 +423,7 @@ final class AppModel: ObservableObject {
         sent = nil
         hotSince = nil
         endsAt = nil
+        ownSeconds = nil
         leftWords = nil
         reason = nil
         callActive = false
@@ -496,7 +503,9 @@ final class AppModel: ObservableObject {
 
     /// The "For" line. A new time starts afresh for the choice in use.
     func setLasting(_ new: Lasting) {
-        guard new != lasting else { return }
+        // A time of its own is running: his tap on the line takes over, also on the pick he already had.
+        guard new != lasting || ownSeconds != nil else { return }
+        ownSeconds = nil
         lasting = new
         UserDefaults.standard.set(new.rawValue, forKey: Key.lasting)
         guard live, choice.appDecides, !callActive else { return }

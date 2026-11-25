@@ -183,9 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @objc private func pretendChip(_ notification: Notification) { model?.pretend(chip: notification.object as? String ?? "real") }
 
     @objc private func chooseFromOutside(_ notification: Notification) {
-        guard let word = notification.object as? String, let choice = FanChoice(rawValue: word) else { return }
-        Diary.note("Asked from outside to switch to \(choice.title)")
-        model?.choose(choice, by: .outside)
+        guard let word = notification.object as? String, let wish = OutsideAsk.parse(word) else { return }
+        Diary.note("Asked from outside to switch to \(wish.choice.title)"
+                   + (wish.seconds.map { " for \(OutsideAsk.words(seconds: $0))" } ?? ""))
+        model?.choose(wish.choice, by: .outside, forSeconds: wish.seconds)
     }
 
     /// The large graph in its own window; it stays fresh while it is open.

@@ -233,4 +233,26 @@ final class MoreTests: XCTestCase {
                        "Fans: you decide (Cool)\nLeft 3,424 · Right – · Chip 72°")
         XCTAssertEqual(Words.hover(.automatic, fans: [], chip: nil), "Fans: the Mac decides\nChip –")
     }
+
+    /// 0.3.1: another app may ask for a choice with a time of its own ("cool:600").
+    func testAWishFromOutsideMayCarryItsOwnTime() {
+        XCTAssertEqual(OutsideAsk.parse("cool")?.choice, .cool)
+        XCTAssertNil(OutsideAsk.parse("cool")?.seconds, "a plain wish follows the For line, as before")
+        XCTAssertEqual(OutsideAsk.parse("cool:600")?.seconds, 600)
+        XCTAssertEqual(OutsideAsk.parse("full:600")?.choice, .full)
+        XCTAssertNil(OutsideAsk.parse("automatic:600")?.seconds, "Automatic never has a time")
+        XCTAssertEqual(OutsideAsk.parse("automatic:600")?.choice, .automatic)
+        XCTAssertEqual(OutsideAsk.parse("cool:5")?.seconds, 60, "never shorter than a minute")
+        XCTAssertEqual(OutsideAsk.parse("cool:999999")?.seconds, 4 * 3600, "never longer than four hours")
+        XCTAssertNil(OutsideAsk.parse("cool:soon"))
+        XCTAssertNil(OutsideAsk.parse("cool:-5"))
+        XCTAssertNil(OutsideAsk.parse("cool:600:1"))
+        XCTAssertNil(OutsideAsk.parse("warm"))
+        XCTAssertEqual(OutsideAsk.words(seconds: 600), "10 minutes")
+        XCTAssertEqual(OutsideAsk.words(seconds: 3600), "1 hour")
+        XCTAssertEqual(OutsideAsk.words(seconds: 5400), "90 minutes")
+        XCTAssertEqual(OutsideAsk.shown(pick: .untilChanged, ownSeconds: nil), .untilChanged)
+        XCTAssertEqual(OutsideAsk.shown(pick: .untilChanged, ownSeconds: 600), .tenMinutes, "the For line shows the time that runs")
+        XCTAssertNil(OutsideAsk.shown(pick: .hour, ownSeconds: 900), "a time that is none of the four lights none")
+    }
 }
